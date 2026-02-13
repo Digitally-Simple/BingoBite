@@ -137,9 +137,12 @@ struct ContentView: View {
             }
         }
         .sheet(isPresented: $showSettings) {
-            SettingsSheet {
-                Task { await loadSongs() }
-            }
+            SettingsSheet(
+                onFolderChanged: { Task { await loadSongs() } },
+                onLicenseDeactivated: {
+                    NotificationCenter.default.post(name: .licenseDeactivated, object: nil)
+                }
+            )
         }
         .task {
             await loadSongs()

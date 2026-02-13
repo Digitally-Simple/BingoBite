@@ -4,6 +4,7 @@ import SwiftData
 enum GameTab: String, CaseIterable {
     case songs = "Songs"
     case boards = "Boards"
+    case info = "Info"
 }
 
 struct BingoGameView: View {
@@ -31,82 +32,25 @@ struct BingoGameView: View {
         )
     }
 
+    private var progressText: String {
+        if bingoGame.isCompleted {
+            return "Completed"
+        } else if bingoGame.currentIndex >= 0 {
+            return "Song \(bingoGame.currentIndex + 1) of \(bingoGame.shuffledSongURLStrings.count)"
+        } else {
+            return "No songs played yet"
+        }
+    }
+
+    private var currentSong: Song? {
+        guard bingoGame.currentIndex >= 0,
+              bingoGame.currentIndex < bingoGame.shuffledSongURLStrings.count else { return nil }
+        let urlString = bingoGame.shuffledSongURLStrings[bingoGame.currentIndex]
+        return songLookup[urlString]
+    }
+
     var body: some View {
-        VStack(spacing: 0) {
-            // Header bar
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(bingoGame.name)
-                        .font(.headline)
-                    if bingoGame.isCompleted {
-                        Text("Completed")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    } else if bingoGame.currentIndex >= 0 {
-                        Text("Song \(bingoGame.currentIndex + 1) of \(bingoGame.shuffledSongURLStrings.count)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    } else {
-                        Text("No songs played yet")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-                Spacer()
-
-                if !bingoGame.isCompleted {
-                    HStack(spacing: 12) {
-                        Button {
-                            previousSong()
-                        } label: {
-                            Image(systemName: "backward.fill")
-                        }
-                        .disabled(bingoGame.currentIndex < 0)
-                        .help("Previous Song")
-
-                        Button {
-                            playPause()
-                        } label: {
-                            Image(systemName: audioPlayer.isPlaying ? "pause.fill" : "play.fill")
-                        }
-                        .disabled(bingoGame.currentIndex < 0)
-                        .help(audioPlayer.isPlaying ? "Pause" : "Play")
-
-                        Button {
-                            nextSong()
-                        } label: {
-                            Image(systemName: "forward.fill")
-                        }
-                        .disabled(bingoGame.currentIndex >= bingoGame.shuffledSongURLStrings.count - 1)
-                        .help("Next Song")
-
-                        Divider()
-                            .frame(height: 20)
-
-                        Button("End Game", role: .destructive) {
-                            endGame()
-                        }
-                        .help("End Game")
-                    }
-                }
-            }
-            .padding(.horizontal)
-            .padding(.vertical, 10)
-
-            Divider()
-
-            // Sub-tab picker
-            Picker("View", selection: $activeTab) {
-                ForEach(GameTab.allCases, id: \.self) { tab in
-                    Text(tab.rawValue).tag(tab)
-                }
-            }
-            .pickerStyle(.segmented)
-            .padding(.horizontal)
-            .padding(.vertical, 8)
-
-            // Content
+        Group {
             switch activeTab {
             case .songs:
                 BingoGameSongListView(
@@ -119,9 +63,62 @@ struct BingoGameView: View {
                     bingoGame: bingoGame,
                     songLookup: songLookup
                 )
+            case .info:
+                BingoGameInfoView(song: currentSong, audioPlayer: audioPlayer)
             }
         }
-        .navigationTitle("Bingo Games")
+        .navigationTitle(bingoGame.name)
+        .navigationSubtitle(progressText)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Picker("View", selection: $activeTab) {
+                    ForEach(GameTab.allCases, id: \.self) { tab in
+                        Text(tab.rawValue).tag(tab)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .frame(maxWidth: 250)
+            }
+
+            if !bingoGame.isCompleted {
+                ToolbarItem(placement: .secondaryAction) {
+                    Button {
+                        previousSong()
+                    } label: {
+                        Image(systemName: "backward.fill")
+                    }
+                    .disabled(bingoGame.currentIndex < 0)
+                    .help("Previous Song")
+                }
+
+                ToolbarItem(placement: .secondaryAction) {
+                    Button {
+                        playPause()
+                    } label: {
+                        Image(systemName: audioPlayer.isPlaying ? "pause.fill" : "play.fill")
+                    }
+                    .disabled(bingoGame.currentIndex < 0)
+                    .help(audioPlayer.isPlaying ? "Pause" : "Play")
+                }
+
+                ToolbarItem(placement: .secondaryAction) {
+                    Button {
+                        nextSong()
+                    } label: {
+                        Image(systemName: "forward.fill")
+                    }
+                    .disabled(bingoGame.currentIndex >= bingoGame.shuffledSongURLStrings.count - 1)
+                    .help("Next Song")
+                }
+
+                ToolbarItem(placement: .secondaryAction) {
+                    Button("End Game", role: .destructive) {
+                        endGame()
+                    }
+                    .help("End Game")
+                }
+            }
+        }
         .onAppear {
             updateBingoSkipHandlers()
         }

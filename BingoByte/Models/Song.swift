@@ -11,9 +11,17 @@ struct Song: Identifiable, Hashable {
     var album: String?
     var artworkData: Data?
 
+    private static let imageCache = NSCache<NSURL, NSImage>()
+
     var artworkImage: NSImage? {
         guard let data = artworkData else { return nil }
-        return NSImage(data: data)
+        let cacheKey = id as NSURL
+        if let cached = Self.imageCache.object(forKey: cacheKey) {
+            return cached
+        }
+        guard let image = NSImage(data: data) else { return nil }
+        Self.imageCache.setObject(image, forKey: cacheKey)
+        return image
     }
 
     var displayTitle: String {
