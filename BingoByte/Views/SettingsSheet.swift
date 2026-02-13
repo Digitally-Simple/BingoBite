@@ -50,6 +50,25 @@ struct SettingsSheet: View {
                 .padding(8)
             }
 
+            GroupBox("Genius API") {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Enter your Genius API access token to display song tidbits in the inspector. Get one free at genius.com/api-clients.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    SecureField("Genius API Key", text: Binding(
+                        get: { settings.geniusAPIKey },
+                        set: { newValue in
+                            settings.geniusAPIKey = newValue
+                            try? modelContext.save()
+                        }
+                    ))
+                    .textFieldStyle(.roundedBorder)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(8)
+            }
+
             Spacer()
 
             HStack {
@@ -61,7 +80,7 @@ struct SettingsSheet: View {
             }
         }
         .padding(24)
-        .frame(width: 450, height: 250)
+        .frame(width: 450, height: 380)
     }
 
     private func chooseFolder() {
