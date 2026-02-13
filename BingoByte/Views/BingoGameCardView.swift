@@ -12,6 +12,15 @@ struct BingoGameCardView: View {
 
     private let bingoColumns = ["B", "I", "N", "G", "O"]
 
+    /// Maps a 1-based song index (from the card grid) to its 1-based position
+    /// in the shuffled play order.
+    private func shuffledNumber(for songIndex: Int) -> Int? {
+        guard songIndex > 0, songIndex <= songURLStrings.count else { return nil }
+        let url = songURLStrings[songIndex - 1]
+        guard let pos = shuffledSongs.firstIndex(of: url) else { return nil }
+        return pos + 1
+    }
+
     private var hasBingo: Bool {
         scoredMatrix.contains { row in row.contains(.bingo) }
     }
@@ -78,7 +87,7 @@ struct BingoGameCardView: View {
                     .font(.system(size: 10))
                     .foregroundStyle(state == .bingo ? Color.white : Color.yellow)
             } else {
-                Text("\(value)")
+                Text("\(shuffledNumber(for: value) ?? value)")
                     .font(.system(size: 10, weight: .medium))
                     .monospacedDigit()
                     .foregroundStyle(state == .unplayed ? Color.secondary : Color.white)
@@ -220,15 +229,6 @@ struct BingoCellPopoverView: View {
 
             // Round info
             VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 6) {
-                    Image(systemName: "number.circle.fill")
-                        .foregroundStyle(.secondary)
-                        .font(.subheadline)
-                    Text("Song #\(songIndex)")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-
                 HStack(spacing: 6) {
                     Image(systemName: "forward.circle.fill")
                         .foregroundStyle(.secondary)

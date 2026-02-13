@@ -17,6 +17,7 @@ struct ContentView: View {
     @State private var selectedPlaylist: Playlist?
     @State private var selectedBingoSet: BingoSet?
     @State private var selectedCard: BingoCard?
+    @State private var selectedBingoGame: BingoGame?
 
     @StateObject private var audioPlayer = AudioPlayerService()
 
@@ -76,7 +77,16 @@ struct ContentView: View {
                     BingoSetListView(selectedBingoSet: $selectedBingoSet, songs: songs)
                 }
             case .bingoGames:
-                BingoGameView(songs: songs, audioPlayer: audioPlayer)
+                if let bingoGame = selectedBingoGame {
+                    BingoGameView(
+                        bingoGame: bingoGame,
+                        songs: songs,
+                        audioPlayer: audioPlayer,
+                        onBack: { selectedBingoGame = nil }
+                    )
+                } else {
+                    BingoGameListView(selectedBingoGame: $selectedBingoGame)
+                }
             }
         }
         .inspector(isPresented: $showInspector) {
@@ -125,6 +135,7 @@ struct ContentView: View {
             selectedPlaylist = nil
             selectedBingoSet = nil
             selectedCard = nil
+            selectedBingoGame = nil
         }
     }
 

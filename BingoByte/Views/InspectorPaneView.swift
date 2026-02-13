@@ -5,10 +5,15 @@ struct InspectorPaneView: View {
     var selectedSong: Song?
     @ObservedObject var audioPlayer: AudioPlayerService
     @Environment(\.modelContext) private var modelContext
+    @Query private var settingsItems: [AppSettings]
 
     @State private var editingStartTime: TimeInterval = 0
     @State private var editingEndTime: TimeInterval = 0
     @State private var hasSoundByte: Bool = false
+
+    private var geniusAPIKey: String {
+        settingsItems.first?.geniusAPIKey ?? ""
+    }
 
     var body: some View {
         Group {
@@ -38,6 +43,11 @@ struct InspectorPaneView: View {
                     .padding(.horizontal)
 
                 metadataSection(song)
+
+                Divider()
+                    .padding(.horizontal)
+
+                SongTidbitsView(song: song, apiKey: geniusAPIKey)
             }
             .padding(.vertical)
         }
