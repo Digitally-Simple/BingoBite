@@ -4,7 +4,7 @@ import SwiftData
 struct PlaylistListView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Playlist.creationDate) private var playlists: [Playlist]
-    @Binding var selectedPlaylist: Playlist?
+    var onSelect: (PersistentIdentifier) -> Void
     var songs: [Song]
 
     @State private var tableSelection: PersistentIdentifier?
@@ -73,18 +73,14 @@ struct PlaylistListView: View {
                         if let id = ids.first,
                            let playlist = playlists.first(where: { $0.persistentModelID == id }) {
                             Button("Delete", role: .destructive) {
-                                if selectedPlaylist?.persistentModelID == playlist.persistentModelID {
-                                    selectedPlaylist = nil
-                                }
                                 tableSelection = nil
                                 PlaylistService.delete(playlist, in: modelContext)
                             }
                             .disabled(BingoSetService.isPlaylistLocked(playlist, in: modelContext))
                         }
                     } primaryAction: { ids in
-                        guard let id = ids.first,
-                              let playlist = playlists.first(where: { $0.persistentModelID == id }) else { return }
-                        selectedPlaylist = playlist
+                        guard let id = ids.first else { return }
+                        onSelect(id)
                     }
                 }
             }
@@ -94,7 +90,7 @@ struct PlaylistListView: View {
             ToolbarItem(placement: .primaryAction) {
                 Button {
                     let newPlaylist = PlaylistService.create(in: modelContext)
-                    selectedPlaylist = newPlaylist
+                    onSelect(newPlaylist.persistentModelID)
                 } label: {
                     Image(systemName: "plus")
                 }

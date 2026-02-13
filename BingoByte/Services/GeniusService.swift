@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 
 struct GeniusSongInfo {
@@ -10,6 +11,17 @@ struct GeniusSongInfo {
     var relationships: [(type: String, songs: [String])]
     var topAnnotation: String?
     var geniusURL: String?
+
+    // Q&A scraped from Genius web page
+    var questionsAndAnswers: [(question: String, answer: String)] = []
+
+    // Additional metadata from /songs response
+    var mediaLinks: [(provider: String, url: String)] = []
+    var albumName: String?
+    var featuredArtists: [String] = []
+    var customPerformances: [(label: String, artists: [String])] = []
+    var pyongsCount: Int?
+    var annotationCount: Int?
 }
 
 @MainActor
@@ -62,10 +74,13 @@ final class GeniusService: ObservableObject {
                 var info = try await fetchSongDetails(songId: songId, apiKey: apiKey)
                 guard !Task.isCancelled else { return }
 
-                // Step 3: Get top annotation
-                let annotation = try await fetchTopAnnotation(songId: songId, apiKey: apiKey)
+                // Step 3: Get top annotation + Q&A in parallel
+                async let annotationResult = fetchTopAnnotation(songId: songId, apiKey: apiKey)
+                async let questionsResult = fetchQuestions(geniusURL: info.geniusURL)
+                let (annotation, questions) = try await (annotationResult, questionsResult)
                 guard !Task.isCancelled else { return }
                 info.topAnnotation = annotation
+                info.questionsAndAnswers = questions
 
                 songInfo = info
                 isLoading = false
@@ -182,6 +197,46 @@ final class GeniusService: ObservableObject {
             }
         }
 
+        // Album name
+        if let album = song["album"] as? [String: Any],
+           let albumName = album["name"] as? String, !albumName.isEmpty {
+            info.albumName = albumName
+        }
+
+        // Featured artists
+        if let featured = song["featured_artists"] as? [[String: Any]] {
+            info.featuredArtists = featured.compactMap { $0["name"] as? String }
+        }
+
+        // Custom performances (additional credits like mixing, mastering, etc.)
+        if let performances = song["custom_performances"] as? [[String: Any]] {
+            info.customPerformances = performances.prefix(5).compactMap { perf in
+                guard let label = perf["label"] as? String,
+                      let artists = perf["artists"] as? [[String: Any]] else { return nil }
+                let names = artists.compactMap { $0["name"] as? String }
+                guard !names.isEmpty else { return nil }
+                return (label: label, artists: names)
+            }
+        }
+
+        // Media links (YouTube, Spotify, SoundCloud, Apple Music)
+        let knownProviders: Set<String> = ["youtube", "spotify", "soundcloud", "apple_music"]
+        if let media = song["media"] as? [[String: Any]] {
+            info.mediaLinks = media.compactMap { item in
+                guard let provider = item["provider"] as? String,
+                      knownProviders.contains(provider),
+                      let url = item["url"] as? String else { return nil }
+                return (provider: provider, url: url)
+            }
+        }
+
+        // Engagement stats
+        if let stats = song["stats"] as? [String: Any] {
+            info.pyongsCount = stats["pyongs_count"] as? Int
+        }
+        info.pyongsCount = info.pyongsCount ?? (song["pyongs_count"] as? Int)
+        info.annotationCount = song["annotation_count"] as? Int
+
         // Genius URL
         info.geniusURL = song["url"] as? String
 
@@ -221,6 +276,85 @@ final class GeniusService: ObservableObject {
         }
 
         return bestAnnotation?.text
+    }
+
+    private func fetchQuestions(geniusURL: String?) async throws -> [(question: String, answer: String)] {
+        guard let urlString = geniusURL, let url = URL(string: urlString) else { return [] }
+
+        let (data, _) = try await URLSession.shared.data(from: url)
+        guard let html = String(data: data, encoding: .utf8) else { return [] }
+
+        // Extract __PRELOADED_STATE__ JSON from the page
+        guard let stateJSON = extractPreloadedState(from: html) else { return [] }
+
+        guard let entities = stateJSON["entities"] as? [String: Any],
+              let questionsMap = entities["questions"] as? [String: Any],
+              let answersMap = entities["answers"] as? [String: Any],
+              let songPage = stateJSON["songPage"] as? [String: Any],
+              let pinnedIds = songPage["pinnedQuestions"] as? [Any] else {
+            return []
+        }
+
+        var results: [(question: String, answer: String)] = []
+        for pinnedId in pinnedIds.prefix(5) {
+            let qKey = "\(pinnedId)"
+            guard let q = questionsMap[qKey] as? [String: Any] else { continue }
+
+            // Question body can be a plain String or a dict with markdown/plain keys
+            let qText: String
+            if let bodyStr = q["body"] as? String {
+                qText = bodyStr
+            } else if let bodyDict = q["body"] as? [String: Any] {
+                qText = bodyDict["markdown"] as? String ?? bodyDict["plain"] as? String ?? ""
+            } else {
+                continue
+            }
+            guard !qText.isEmpty else { continue }
+
+            guard let ansId = q["answer"],
+                  let aObj = answersMap["\(ansId)"] as? [String: Any],
+                  let aBody = aObj["body"] as? [String: Any] else { continue }
+            var aText = aBody["markdown"] as? String ?? aBody["plain"] as? String ?? ""
+            guard !aText.isEmpty else { continue }
+
+            // Strip markdown links: [text](url) → text
+            aText = aText.replacingOccurrences(
+                of: "\\[([^\\]]+)\\]\\([^)]+\\)",
+                with: "$1",
+                options: .regularExpression
+            )
+
+            results.append((question: qText, answer: aText))
+        }
+        return results
+    }
+
+    private func extractPreloadedState(from html: String) -> [String: Any]? {
+        guard let startMarker = html.range(of: "window.__PRELOADED_STATE__ = JSON.parse('"),
+              let endMarker = html.range(of: "');", range: startMarker.upperBound..<html.endIndex) else {
+            return nil
+        }
+
+        var raw = String(html[startMarker.upperBound..<endMarker.lowerBound])
+
+        // Unescape JS string: the content is a JSON string inside JS single quotes
+        // Handle \\ first (to preserve literal backslashes), then \" and \'
+        raw = raw.replacingOccurrences(of: "\\\\", with: "\u{0000}PH\u{0000}")
+        raw = raw.replacingOccurrences(of: "\\\"", with: "\"")
+        raw = raw.replacingOccurrences(of: "\\'", with: "'")
+        raw = raw.replacingOccurrences(of: "\u{0000}PH\u{0000}", with: "\\")
+
+        // Fix invalid JSON escapes (e.g. \$ in user-generated content)
+        let pattern = try? NSRegularExpression(pattern: "\\\\(?![\"\\\\\\//bfnrtu])")
+        if let pattern {
+            raw = pattern.stringByReplacingMatches(in: raw, range: NSRange(raw.startIndex..., in: raw), withTemplate: "")
+        }
+
+        guard let jsonData = raw.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any] else {
+            return nil
+        }
+        return json
     }
 }
 

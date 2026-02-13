@@ -4,7 +4,6 @@ import SwiftData
 struct PlaylistEditorView: View {
     @Bindable var playlist: Playlist
     var songs: [Song]
-    var onBack: () -> Void
 
     @Environment(\.modelContext) private var modelContext
 
@@ -78,19 +77,6 @@ struct PlaylistEditorView: View {
             tablesSection
         }
         .navigationTitle(playlist.name)
-        .toolbar {
-            ToolbarItem(placement: .navigation) {
-                Button {
-                    onBack()
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "chevron.left")
-                        Text("Playlists")
-                    }
-                }
-                .help("Back to Playlists")
-            }
-        }
     }
 
     // MARK: - Header

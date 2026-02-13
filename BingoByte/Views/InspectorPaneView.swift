@@ -170,13 +170,14 @@ struct InspectorPaneView: View {
             // Transport controls
             HStack(spacing: 24) {
                 Button {
-                    audioPlayer.seek(to: 0)
+                    audioPlayer.skipBackward()
                 } label: {
-                    Image(systemName: "backward.fill")
+                    Image(systemName: "backward.end.fill")
                         .font(.title3)
                 }
                 .buttonStyle(.borderless)
-                .help("Restart")
+                .disabled(!audioPlayer.canSkipBackward)
+                .help("Previous")
 
                 Button {
                     audioPlayer.togglePlayPause()
@@ -188,15 +189,26 @@ struct InspectorPaneView: View {
                 .help(audioPlayer.isPlaying ? "Pause" : "Play")
 
                 Button {
-                    audioPlayer.stop()
+                    audioPlayer.skipForward()
                 } label: {
-                    Image(systemName: "forward.fill")
+                    Image(systemName: "forward.end.fill")
                         .font(.title3)
                 }
                 .buttonStyle(.borderless)
-                .help("Stop")
+                .disabled(!audioPlayer.canSkipForward)
+                .help("Next")
             }
             .padding(.top, 4)
+
+            Button {
+                audioPlayer.stop()
+            } label: {
+                Image(systemName: "stop.fill")
+                    .font(.caption)
+            }
+            .buttonStyle(.borderless)
+            .help("Stop")
+            .padding(.top, 2)
         }
     }
 

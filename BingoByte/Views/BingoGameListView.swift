@@ -4,7 +4,7 @@ import SwiftData
 struct BingoGameListView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \BingoGame.creationDate, order: .reverse) private var bingoGames: [BingoGame]
-    @Binding var selectedBingoGame: BingoGame?
+    var onSelect: (PersistentIdentifier) -> Void
 
     @State private var tableSelection: PersistentIdentifier?
     @State private var sortOrder = [KeyPathComparator(\BingoGame.creationDate, order: .reverse)]
@@ -77,17 +77,13 @@ struct BingoGameListView: View {
                         if let id = ids.first,
                            let game = bingoGames.first(where: { $0.persistentModelID == id }) {
                             Button("Delete", role: .destructive) {
-                                if selectedBingoGame?.persistentModelID == game.persistentModelID {
-                                    selectedBingoGame = nil
-                                }
                                 tableSelection = nil
                                 BingoGameService.delete(game, in: modelContext)
                             }
                         }
                     } primaryAction: { ids in
-                        guard let id = ids.first,
-                              let game = bingoGames.first(where: { $0.persistentModelID == id }) else { return }
-                        selectedBingoGame = game
+                        guard let id = ids.first else { return }
+                        onSelect(id)
                     }
                 }
             }
@@ -105,7 +101,7 @@ struct BingoGameListView: View {
         }
         .sheet(isPresented: $showCreateSheet) {
             BingoGameCreateSheet { game in
-                selectedBingoGame = game
+                onSelect(game.persistentModelID)
             }
         }
     }

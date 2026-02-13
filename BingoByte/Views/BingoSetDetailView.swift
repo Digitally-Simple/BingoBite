@@ -2,7 +2,6 @@ import SwiftUI
 
 struct BingoSetDetailView: View {
     var bingoSet: BingoSet
-    var onBack: () -> Void
     @Binding var selectedCard: BingoCard?
 
     @State private var tableSelection: Int?
@@ -23,19 +22,6 @@ struct BingoSetDetailView: View {
             cardsTable
         }
         .navigationTitle(bingoSet.name)
-        .toolbar {
-            ToolbarItem(placement: .navigation) {
-                Button {
-                    onBack()
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "chevron.left")
-                        Text("Bingo Sets")
-                    }
-                }
-                .help("Back to Bingo Sets")
-            }
-        }
         .onChange(of: tableSelection) {
             if let id = tableSelection {
                 selectedCard = cards.first { $0.id == id }

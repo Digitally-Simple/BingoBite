@@ -11,7 +11,6 @@ struct BingoGameView: View {
     var bingoGame: BingoGame
     var songs: [Song]
     @ObservedObject var audioPlayer: AudioPlayerService
-    var onBack: () -> Void
 
     @State private var activeTab: GameTab = .songs
 
@@ -123,18 +122,14 @@ struct BingoGameView: View {
             }
         }
         .navigationTitle("Bingo Games")
-        .toolbar {
-            ToolbarItem(placement: .navigation) {
-                Button {
-                    audioPlayer.stop()
-                    onBack()
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "chevron.left")
-                        Text("Games")
-                    }
-                }
-            }
+        .onAppear {
+            updateBingoSkipHandlers()
+        }
+        .onDisappear {
+            audioPlayer.clearSkipHandlers()
+        }
+        .onChange(of: bingoGame.currentIndex) {
+            updateBingoSkipHandlers()
         }
     }
 
@@ -167,12 +162,64 @@ struct BingoGameView: View {
               bingoGame.currentIndex < bingoGame.shuffledSongURLStrings.count else { return }
         let urlString = bingoGame.shuffledSongURLStrings[bingoGame.currentIndex]
         if let song = songLookup[urlString] {
-            audioPlayer.play(song)
+            if let soundByte = SoundByteService.fetch(for: song, in: modelContext) {
+                audioPlayer.play(song, from: soundByte.startTime)
+            } else {
+                audioPlayer.play(song)
+            }
         }
     }
 
     private func endGame() {
         audioPlayer.stop()
+        audioPlayer.clearSkipHandlers()
         BingoGameService.endGame(bingoGame, in: modelContext)
+    }
+
+    private func updateBingoSkipHandlers() {
+        guard !bingoGame.isCompleted else {
+            audioPlayer.clearSkipHandlers()
+            return
+        }
+
+        let canBack = bingoGame.currentIndex >= 0
+        let canForward = bingoGame.currentIndex < bingoGame.shuffledSongURLStrings.count - 1
+        let game = bingoGame
+        let player = audioPlayer
+        let ctx = modelContext
+        let lookup = songLookup
+
+        player.onSkipForward = canForward ? {
+            BingoGameService.advanceToNextSong(game, in: ctx)
+            guard game.currentIndex >= 0,
+                  game.currentIndex < game.shuffledSongURLStrings.count else { return }
+            let urlString = game.shuffledSongURLStrings[game.currentIndex]
+            if let song = lookup[urlString] {
+                if let soundByte = SoundByteService.fetch(for: song, in: ctx) {
+                    player.play(song, from: soundByte.startTime)
+                } else {
+                    player.play(song)
+                }
+            }
+        } : nil
+
+        player.onSkipBackward = canBack ? {
+            BingoGameService.goToPreviousSong(game, in: ctx)
+            if game.currentIndex >= 0 {
+                guard game.currentIndex < game.shuffledSongURLStrings.count else { return }
+                let urlString = game.shuffledSongURLStrings[game.currentIndex]
+                if let song = lookup[urlString] {
+                    if let soundByte = SoundByteService.fetch(for: song, in: ctx) {
+                        player.play(song, from: soundByte.startTime)
+                    } else {
+                        player.play(song)
+                    }
+                }
+            } else {
+                player.stop()
+            }
+        } : nil
+
+        player.setSkipState(canForward: canForward, canBackward: canBack)
     }
 }
