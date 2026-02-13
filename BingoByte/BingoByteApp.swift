@@ -13,7 +13,7 @@ struct BingoByteApp: App {
     let container: ModelContainer
 
     init() {
-        let container = try! ModelContainer(for: AppSettings.self, SoundByte.self, Playlist.self, BingoSet.self)
+        let container = try! ModelContainer(for: AppSettings.self, SoundByte.self, Playlist.self, BingoSet.self, BingoGame.self)
         self.container = container
 
         // Backfill UUIDs for existing playlists migrated with empty default
