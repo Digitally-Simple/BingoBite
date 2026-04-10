@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 """
-Spotify Playlist Downloader — companion script for BingoByte.
+Spotify Playlist Downloader — companion script for BingoBite.
 
 Downloads songs from a Spotify playlist using spotdl's Python API,
 and generates a master CSV of the full playlist metadata.
