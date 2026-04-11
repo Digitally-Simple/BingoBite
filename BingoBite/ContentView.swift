@@ -9,6 +9,7 @@ struct ContentView: View {
     @State private var sidebarSelection: SidebarSelection? = .allPlaylists
     @State private var showSettings = false
     @State private var showInspector = true
+    @State private var selectedSong: Song?
 
     @StateObject private var audioPlayer = AudioPlayerService()
 
@@ -36,6 +37,7 @@ struct ContentView: View {
                     PlaylistDetailView(
                         playlist: playlist,
                         audioPlayer: audioPlayer,
+                        selectedSong: $selectedSong,
                         onGameCreated: { game in
                             sidebarSelection = .bingoGame(game.persistentModelID)
                         }
@@ -59,7 +61,7 @@ struct ContentView: View {
             }
         }
         .inspector(isPresented: $showInspector) {
-            InspectorPaneView(selectedSong: audioPlayer.currentSong, audioPlayer: audioPlayer)
+            InspectorPaneView(selectedSong: selectedSong ?? audioPlayer.currentSong, audioPlayer: audioPlayer)
                 .inspectorColumnWidth(min: 250, ideal: 300, max: 400)
         }
         .toolbar {
@@ -88,6 +90,7 @@ struct ContentView: View {
             )
         }
         .onChange(of: sidebarSelection) { oldValue, newValue in
+            selectedSong = nil
             let oldKind = oldValue?.kind
             let newKind = newValue?.kind
             if oldKind != newKind {

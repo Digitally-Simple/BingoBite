@@ -5,14 +5,19 @@ import AppKit
 struct PlaylistDetailView: View {
     var playlist: Playlist
     @ObservedObject var audioPlayer: AudioPlayerService
+    @Binding var selectedSong: Song?
     var onGameCreated: (BingoGame) -> Void = { _ in }
 
     @Environment(\.modelContext) private var modelContext
 
+    @Query private var allSoundBytes: [SoundByte]
+
     @State private var songs: [Song] = []
+    @State private var tableSelection: Song.ID?
     @State private var accessedURL: URL?
     @State private var isLoading: Bool = true
     @State private var loadError: String?
+    @State private var showCardDesigner: Bool = false
 
     private var uniqueArtistCount: Int {
         Set(songs.compactMap { $0.artist }).count
@@ -20,6 +25,10 @@ struct PlaylistDetailView: View {
 
     private var totalPlaytime: TimeInterval {
         songs.compactMap { $0.duration }.reduce(0, +)
+    }
+
+    private var soundByteLookup: [String: SoundByte] {
+        Dictionary(uniqueKeysWithValues: allSoundBytes.map { ($0.songURLString, $0) })
     }
 
     var body: some View {
@@ -38,6 +47,9 @@ struct PlaylistDetailView: View {
         }
         .onDisappear {
             releaseAccess()
+        }
+        .sheet(isPresented: $showCardDesigner) {
+            CardDesignerSheet(playlist: playlist, songs: songs)
         }
     }
 
@@ -67,6 +79,13 @@ struct PlaylistDetailView: View {
                         Label("Start New Game", systemImage: "play.fill")
                     }
                     .keyboardShortcut("n", modifiers: [.command])
+                    .disabled(playlist.songCount < (playlist.hasFreeSpace ? 24 : 25) || loadError != nil)
+
+                    Button {
+                        showCardDesigner = true
+                    } label: {
+                        Label("Design & Print Cards", systemImage: "printer")
+                    }
                     .disabled(playlist.songCount < (playlist.hasFreeSpace ? 24 : 25) || loadError != nil)
                 }
                 .padding(.top, 4)
@@ -190,13 +209,33 @@ struct PlaylistDetailView: View {
     }
 
     private var songsTable: some View {
-        Table(songs) {
+        Table(songs, selection: $tableSelection) {
+            TableColumn("") { (song: Song) in
+                Group {
+                    if let image = song.artworkImage {
+                        Image(nsImage: image)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    } else {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 3)
+                                .fill(.quaternary)
+                            Image(systemName: "music.note")
+                                .font(.system(size: 10))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                .frame(width: 24, height: 24)
+                .clipShape(RoundedRectangle(cornerRadius: 3))
+            }
+            .width(30)
             TableColumn("") { (song: Song) in
                 Button {
                     audioPlayer.play(song)
                 } label: {
                     Image(systemName: audioPlayer.currentSong == song && audioPlayer.isPlaying ? "pause.circle.fill" : "play.circle.fill")
-                        .foregroundStyle(Color.accentColor)
+                        .foregroundStyle(tableSelection == song.id ? .white : Color.accentColor)
                 }
                 .buttonStyle(.borderless)
             }
@@ -213,6 +252,30 @@ struct PlaylistDetailView: View {
                     .monospacedDigit()
             }
             .width(ideal: 70)
+            TableColumn("Start") { (song: Song) in
+                let sb = soundByteLookup[song.id.absoluteString]
+                Text(sb != nil ? Self.formatTime(sb!.startTime) : "--:--")
+                    .monospacedDigit()
+                    .foregroundStyle(sb != nil ? .primary : .tertiary)
+            }
+            .width(ideal: 60)
+            TableColumn("Stop") { (song: Song) in
+                let sb = soundByteLookup[song.id.absoluteString]
+                Text(sb != nil ? Self.formatTime(sb!.endTime) : "--:--")
+                    .monospacedDigit()
+                    .foregroundStyle(sb != nil ? .primary : .tertiary)
+            }
+            .width(ideal: 60)
+            TableColumn("Clip") { (song: Song) in
+                let sb = soundByteLookup[song.id.absoluteString]
+                Text(sb != nil ? Self.formatTime(sb!.clipDuration) : "--:--")
+                    .monospacedDigit()
+                    .foregroundStyle(sb != nil ? .primary : .tertiary)
+            }
+            .width(ideal: 60)
+        }
+        .onChange(of: tableSelection) {
+            selectedSong = songs.first { $0.id == tableSelection }
         }
     }
 
@@ -249,6 +312,12 @@ struct PlaylistDetailView: View {
     }
 
     // MARK: - Helpers
+
+    private static func formatTime(_ time: TimeInterval) -> String {
+        let minutes = Int(time) / 60
+        let seconds = Int(time) % 60
+        return String(format: "%d:%02d", minutes, seconds)
+    }
 
     private func formatDuration(_ time: TimeInterval) -> String {
         let totalSeconds = Int(time)

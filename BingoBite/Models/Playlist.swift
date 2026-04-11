@@ -14,6 +14,7 @@ final class Playlist {
     var hasFreeSpace: Bool = true
     var cardsData: Data = Data()
     var coverArtData: Data? = nil
+    var cardDesignData: Data? = nil
 
     var songCount: Int {
         songURLStrings.count
@@ -30,6 +31,7 @@ final class Playlist {
         hasFreeSpace: Bool,
         cardsData: Data,
         coverArtData: Data? = nil,
+        cardDesignData: Data? = nil,
         creationDate: Date = Date()
     ) {
         self.uuid = uuid
@@ -42,6 +44,7 @@ final class Playlist {
         self.hasFreeSpace = hasFreeSpace
         self.cardsData = cardsData
         self.coverArtData = coverArtData
+        self.cardDesignData = cardDesignData
         self.creationDate = creationDate
     }
 }

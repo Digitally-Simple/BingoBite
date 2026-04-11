@@ -6,8 +6,8 @@ struct InspectorPaneView: View {
     @ObservedObject var audioPlayer: AudioPlayerService
     @Environment(\.modelContext) private var modelContext
 
-    @State private var editingStartTime: TimeInterval = 0
-    @State private var editingEndTime: TimeInterval = 0
+    @State private var editingStartTime: TimeInterval?
+    @State private var editingEndTime: TimeInterval?
     @State private var hasSoundByte: Bool = false
 
     var body: some View {
@@ -71,10 +71,20 @@ struct InspectorPaneView: View {
             }
             .padding(.horizontal)
 
-            // Playback controls (only when this song is playing)
+            // Playback controls
             if audioPlayer.currentSong == song {
                 playbackControls
                     .padding(.horizontal, 24)
+            } else {
+                Button {
+                    audioPlayer.play(song)
+                } label: {
+                    Image(systemName: "play.circle.fill")
+                        .font(.system(size: 36))
+                }
+                .buttonStyle(.borderless)
+                .help("Play")
+                .padding(.top, 4)
             }
         }
     }
@@ -117,31 +127,37 @@ struct InspectorPaneView: View {
                 .controlSize(.small)
 
                 // Sound byte overlay markers
-                if hasSoundByte && audioPlayer.duration > 0 {
+                if audioPlayer.duration > 0, editingStartTime != nil || editingEndTime != nil {
                     GeometryReader { geo in
-                        let startFraction = editingStartTime / audioPlayer.duration
-                        let endFraction = editingEndTime / audioPlayer.duration
+                        let startFraction = (editingStartTime ?? 0) / audioPlayer.duration
+                        let endFraction = (editingEndTime ?? 0) / audioPlayer.duration
 
                         // Highlighted region between markers
-                        Rectangle()
-                            .fill(Color.green.opacity(0.15))
-                            .frame(
-                                width: max(0, CGFloat(endFraction - startFraction) * geo.size.width),
-                                height: geo.size.height
-                            )
-                            .offset(x: CGFloat(startFraction) * geo.size.width)
+                        if let _ = editingStartTime, let _ = editingEndTime {
+                            Rectangle()
+                                .fill(Color.green.opacity(0.15))
+                                .frame(
+                                    width: max(0, CGFloat(endFraction - startFraction) * geo.size.width),
+                                    height: geo.size.height
+                                )
+                                .offset(x: CGFloat(startFraction) * geo.size.width)
+                        }
 
                         // Start marker (green)
-                        Rectangle()
-                            .fill(Color.green)
-                            .frame(width: 2, height: geo.size.height)
-                            .offset(x: CGFloat(startFraction) * geo.size.width - 1)
+                        if let _ = editingStartTime {
+                            Rectangle()
+                                .fill(Color.green)
+                                .frame(width: 2, height: geo.size.height)
+                                .offset(x: CGFloat(startFraction) * geo.size.width - 1)
+                        }
 
                         // End marker (red)
-                        Rectangle()
-                            .fill(Color.red)
-                            .frame(width: 2, height: geo.size.height)
-                            .offset(x: CGFloat(endFraction) * geo.size.width - 1)
+                        if let _ = editingEndTime {
+                            Rectangle()
+                                .fill(Color.red)
+                                .frame(width: 2, height: geo.size.height)
+                                .offset(x: CGFloat(endFraction) * geo.size.width - 1)
+                        }
                     }
                     .allowsHitTesting(false)
                 }
@@ -220,11 +236,15 @@ struct InspectorPaneView: View {
                     Text("Start")
                         .foregroundStyle(.secondary)
                         .frame(width: 40, alignment: .leading)
-                    Text(Self.formatTime(editingStartTime))
+                    Text(editingStartTime.map { Self.formatTime($0) } ?? "--:--")
                         .monospacedDigit()
                     Spacer()
                     Button("Set to Now") {
-                        editingStartTime = audioPlayer.currentTime
+                        let now = audioPlayer.currentTime
+                        editingStartTime = now
+                        if let end = editingEndTime, end <= now {
+                            editingEndTime = nil
+                        }
                     }
                     .controlSize(.small)
                     .disabled(audioPlayer.currentSong != song)
@@ -236,11 +256,15 @@ struct InspectorPaneView: View {
                     Text("End")
                         .foregroundStyle(.secondary)
                         .frame(width: 40, alignment: .leading)
-                    Text(Self.formatTime(editingEndTime))
+                    Text(editingEndTime.map { Self.formatTime($0) } ?? "--:--")
                         .monospacedDigit()
                     Spacer()
                     Button("Set to Now") {
-                        editingEndTime = audioPlayer.currentTime
+                        let now = audioPlayer.currentTime
+                        if let start = editingStartTime, now <= start {
+                            editingStartTime = nil
+                        }
+                        editingEndTime = now
                     }
                     .controlSize(.small)
                     .disabled(audioPlayer.currentSong != song)
@@ -250,26 +274,30 @@ struct InspectorPaneView: View {
                 // Action buttons
                 HStack(spacing: 8) {
                     Button("Save") {
-                        SoundByteService.save(
-                            for: song,
-                            startTime: editingStartTime,
-                            endTime: editingEndTime,
-                            in: modelContext
-                        )
-                        hasSoundByte = true
+                        if let start = editingStartTime, let end = editingEndTime {
+                            SoundByteService.save(
+                                for: song,
+                                startTime: start,
+                                endTime: end,
+                                in: modelContext
+                            )
+                            hasSoundByte = true
+                        }
                     }
-                    .disabled(editingEndTime <= editingStartTime)
+                    .disabled(!hasValidRange)
 
                     Button("Preview") {
-                        audioPlayer.preview(song, startTime: editingStartTime, endTime: editingEndTime)
+                        if let start = editingStartTime, let end = editingEndTime {
+                            audioPlayer.preview(song, startTime: start, endTime: end)
+                        }
                     }
-                    .disabled(editingEndTime <= editingStartTime)
+                    .disabled(!hasValidRange)
 
                     if hasSoundByte {
                         Button("Clear") {
                             SoundByteService.remove(for: song, in: modelContext)
-                            editingStartTime = 0
-                            editingEndTime = 0
+                            editingStartTime = nil
+                            editingEndTime = nil
                             hasSoundByte = false
                         }
                     }
@@ -309,13 +337,13 @@ struct InspectorPaneView: View {
                 Divider().padding(.leading)
                 metadataRow(label: "File", value: song.fileName)
 
-                if hasSoundByte {
+                if hasSoundByte, let start = editingStartTime, let end = editingEndTime {
                     Divider().padding(.leading)
-                    metadataRow(label: "Clip Start", value: Self.formatTime(editingStartTime))
+                    metadataRow(label: "Clip Start", value: Self.formatTime(start))
                     Divider().padding(.leading)
-                    metadataRow(label: "Clip End", value: Self.formatTime(editingEndTime))
+                    metadataRow(label: "Clip End", value: Self.formatTime(end))
                     Divider().padding(.leading)
-                    metadataRow(label: "Clip Len", value: Self.formatTime(editingEndTime - editingStartTime))
+                    metadataRow(label: "Clip Len", value: Self.formatTime(end - start))
                 }
             }
         }
@@ -338,10 +366,15 @@ struct InspectorPaneView: View {
 
     // MARK: - Helpers
 
+    private var hasValidRange: Bool {
+        guard let start = editingStartTime, let end = editingEndTime else { return false }
+        return end > start
+    }
+
     private func loadSoundByte() {
         guard let song = selectedSong else {
-            editingStartTime = 0
-            editingEndTime = 0
+            editingStartTime = nil
+            editingEndTime = nil
             hasSoundByte = false
             return
         }
@@ -350,8 +383,8 @@ struct InspectorPaneView: View {
             editingEndTime = soundByte.endTime
             hasSoundByte = true
         } else {
-            editingStartTime = 0
-            editingEndTime = 0
+            editingStartTime = nil
+            editingEndTime = nil
             hasSoundByte = false
         }
     }
