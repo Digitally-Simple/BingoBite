@@ -36,10 +36,14 @@ struct CardDesignSettings: Codable, Equatable {
     var freeSpaceText: String = "FREE"
     var freeSpaceColorHex: String = "#FFD700"
 
+    // MARK: - Card Number
+    var showCardNumbers: Bool = true
+    var cardNumberFontSize: CGFloat = 10
+    var cardNumberColorHex: String = "#999999"
+
     // MARK: - Page Layout
     var cardsPerPage: Int = 1
     var pageOrientation: String = "portrait"
-    var showCardNumbers: Bool = true
 
     // MARK: - Image Overlays
     var imageOverlays: [ImageOverlay] = []

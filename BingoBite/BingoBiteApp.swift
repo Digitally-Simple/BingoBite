@@ -7,12 +7,15 @@
 
 import SwiftUI
 import SwiftData
+import Sparkle
 
 @main
 struct BingoBiteApp: App {
     let container: ModelContainer
     @State private var isLicensed = false
     @State private var hasCheckedLicense = false
+
+    private let updaterController: SPUStandardUpdaterController
 
     private static let schemaVersionKey = "BingoBite.SchemaVersion"
     private static let currentSchemaVersion = 2
@@ -21,6 +24,11 @@ struct BingoBiteApp: App {
         Self.resetStoreIfNeeded()
         let container = try! ModelContainer(for: AppSettings.self, SoundByte.self, Playlist.self, BingoGame.self)
         self.container = container
+        self.updaterController = SPUStandardUpdaterController(
+            startingUpdater: true,
+            updaterDelegate: nil,
+            userDriverDelegate: nil
+        )
     }
 
     private static func resetStoreIfNeeded() {
@@ -62,6 +70,9 @@ struct BingoBiteApp: App {
         .modelContainer(container)
         .commands {
             InspectorCommands()
+            CommandGroup(after: .appInfo) {
+                CheckForUpdatesView(updater: updaterController.updater)
+            }
         }
     }
 

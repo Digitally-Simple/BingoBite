@@ -17,6 +17,7 @@ struct CardDesignControlsView: View {
                 typographySection
                 colorsSection
                 cardTitleSection
+                cardNumberSection
                 freeSpaceSection
                 pageLayoutSection
                 imageOverlaysSection
@@ -197,8 +198,32 @@ struct CardDesignControlsView: View {
                     Text("Portrait").tag("portrait")
                     Text("Landscape").tag("landscape")
                 }
+            }
+            .padding(.vertical, 4)
+        }
+    }
 
-                Toggle("Show Card Numbers", isOn: $settings.showCardNumbers)
+    // MARK: - Card Number
+
+    private var cardNumberSection: some View {
+        GroupBox("Card Number") {
+            VStack(alignment: .leading, spacing: 8) {
+                Toggle("Show Card Number", isOn: $settings.showCardNumbers)
+
+                if settings.showCardNumbers {
+                    HStack {
+                        Text("Size")
+                        Spacer()
+                        Stepper(
+                            "\(Int(settings.cardNumberFontSize)) pt",
+                            value: $settings.cardNumberFontSize,
+                            in: 6...20,
+                            step: 1
+                        )
+                    }
+
+                    ColorPicker("Color", selection: hexColorBinding($settings.cardNumberColorHex))
+                }
             }
             .padding(.vertical, 4)
         }

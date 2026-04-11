@@ -20,19 +20,11 @@ struct PrintableBingoCardView: View {
             Spacer(minLength: 0)
 
             // Card title
-            HStack(spacing: 4) {
-                Text(settings.cardTitle)
-                    .font(settings.font(size: settings.cardTitleFontSize))
-                    .fontWeight(settings.resolvedFontWeight)
-                    .foregroundStyle(Color(hex: settings.cardTitleColorHex))
-
-                if settings.showCardNumbers {
-                    Text("#\(card.id)")
-                        .font(settings.font(size: settings.cardTitleFontSize * 0.5))
-                        .foregroundStyle(Color(hex: settings.cardTitleColorHex).opacity(0.6))
-                }
-            }
-            .padding(.bottom, 8)
+            Text(settings.cardTitle)
+                .font(settings.font(size: settings.cardTitleFontSize))
+                .fontWeight(settings.resolvedFontWeight)
+                .foregroundStyle(Color(hex: settings.cardTitleColorHex))
+                .padding(.bottom, 8)
 
             // Grid with headers and cells
             VStack(spacing: 0) {
@@ -67,6 +59,17 @@ struct PrintableBingoCardView: View {
                 RoundedRectangle(cornerRadius: 4)
                     .stroke(Color(hex: settings.borderColorHex), lineWidth: settings.borderWidth)
             )
+
+            // Card number bottom-right
+            if settings.showCardNumbers {
+                HStack {
+                    Spacer()
+                    Text("Card #\(card.id)")
+                        .font(settings.font(size: settings.cardNumberFontSize))
+                        .foregroundStyle(Color(hex: settings.cardNumberColorHex))
+                }
+                .padding(.top, 4)
+            }
 
             Spacer(minLength: 0)
         }

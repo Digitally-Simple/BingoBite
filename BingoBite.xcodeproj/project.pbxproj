@@ -6,13 +6,30 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		445243742F8AB8D6001512A8 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 445243732F8AB8D6001512A8 /* Sparkle */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		44422FEB2F38581400081179 /* BingoBite.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BingoBite.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		445243762F8ABB99001512A8 /* Exceptions for "BingoBite" folder in "BingoBite" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 44422FEA2F38581400081179 /* BingoBite */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		44422FED2F38581400081179 /* BingoBite */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				445243762F8ABB99001512A8 /* Exceptions for "BingoBite" folder in "BingoBite" target */,
+			);
 			path = BingoBite;
 			sourceTree = "<group>";
 		};
@@ -23,6 +40,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				445243742F8AB8D6001512A8 /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -65,6 +83,7 @@
 			);
 			name = BingoBite;
 			packageProductDependencies = (
+				445243732F8AB8D6001512A8 /* Sparkle */,
 			);
 			productName = BingoBite;
 			productReference = 44422FEB2F38581400081179 /* BingoBite.app */;
@@ -94,6 +113,9 @@
 			);
 			mainGroup = 44422FE22F38581400081179;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				445243722F8AB8D6001512A8 /* XCRemoteSwiftPackageReference "Sparkle" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 44422FEC2F38581400081179 /* Products */;
 			projectDirPath = "";
@@ -260,6 +282,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readwrite;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = BingoBite/Info.plist;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -293,6 +316,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readwrite;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = BingoBite/Info.plist;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -333,6 +357,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		445243722F8AB8D6001512A8 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.9.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		445243732F8AB8D6001512A8 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 445243722F8AB8D6001512A8 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 44422FE32F38581400081179 /* Project object */;
 }
