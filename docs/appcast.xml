@@ -6,28 +6,24 @@
     <description>BingoBite Updates</description>
     <language>en</language>
 
-    <!-- Replace this item with your first real release -->
-    <!--
     <item>
       <title>Version 1.0.1</title>
       <sparkle:version>2</sparkle:version>
       <sparkle:shortVersionString>1.0.1</sparkle:shortVersionString>
-      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
       <description><![CDATA[
         <h2>What's New</h2>
         <ul>
-          <li>Bug fixes and improvements</li>
+          <li>Test Sparkle update</li>
         </ul>
       ]]></description>
-      <pubDate>Sat, 11 Apr 2026 12:00:00 +0000</pubDate>
+      <pubDate>Fri, 11 Apr 2026 12:00:00 +0000</pubDate>
       <enclosure
-        url="https://github.com/Digitally-Simple/BingoBite/releases/download/v1.0.1/BingoBite.zip"
-        length="FILESIZE_IN_BYTES"
+        url="https://github.com/Digitally-Simple/BingoBite/releases/download/v1.0.1/BingoBite-1.0.1.zip"
+        length="1964911"
         type="application/octet-stream"
-        sparkle:edSignature="YOUR_ED_SIGNATURE"
+        sparkle:edSignature="4pbUk8tL1gFbjvrOU1a+xM5vXn+yQW+QXR7z8avi4/TB27CXztEIhMeNb6C0uDFaAc93zWFtUyRUygXbBjO2Cw=="
       />
     </item>
-    -->
 
   </channel>
 </rss>
