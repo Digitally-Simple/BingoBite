@@ -13,6 +13,9 @@ import Sparkle
 struct BingoBiteApp: App {
     let container: ModelContainer
     @State private var isLicensed = false
+    @State private var isTrialing = false
+    @State private var trialDaysRemaining = 0
+    @State private var trialExpired = false
     @State private var hasCheckedLicense = false
 
     private let updaterController: SPUStandardUpdaterController
@@ -22,7 +25,7 @@ struct BingoBiteApp: App {
 
     init() {
         Self.resetStoreIfNeeded()
-        let container = try! ModelContainer(for: AppSettings.self, SoundByte.self, Playlist.self, BingoGame.self)
+        let container = try! ModelContainer(for: AppSettings.self, SoundByte.self, Playlist.self, BingoGame.self, SongMetadataOverride.self)
         self.container = container
         self.updaterController = SPUStandardUpdaterController(
             startingUpdater: true,
@@ -52,12 +55,17 @@ struct BingoBiteApp: App {
                 if !hasCheckedLicense {
                     ProgressView("Checking license...")
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if isLicensed {
-                    ContentView()
+                } else if isLicensed || isTrialing {
+                    ContentView(trialDaysRemaining: isTrialing ? trialDaysRemaining : nil)
                 } else {
-                    LicenseGateView {
-                        isLicensed = true
-                    }
+                    LicenseGateView(
+                        trialExpired: trialExpired,
+                        onActivated: { isLicensed = true },
+                        onTrialStarted: {
+                            isTrialing = true
+                            trialDaysRemaining = TrialService.trialDurationDays
+                        }
+                    )
                 }
             }
             .task {
@@ -88,27 +96,38 @@ struct BingoBiteApp: App {
         let key = settings.licenseKey
         let instanceId = settings.licenseKeyInstanceId
 
-        guard !key.isEmpty, !instanceId.isEmpty else {
-            hasCheckedLicense = true
-            return
+        // 1. Check license key if present
+        if !key.isEmpty, !instanceId.isEmpty {
+            do {
+                let valid = try await LicenseService.validate(licenseKey: key, instanceId: instanceId)
+                if valid {
+                    settings.lastLicenseValidationDate = Date()
+                    try? context.save()
+                    isLicensed = true
+                    hasCheckedLicense = true
+                    return
+                } else {
+                    LicenseService.clearLicense(settings: settings, in: context)
+                }
+            } catch {
+                if LicenseService.isWithinOfflineGracePeriod(lastValidation: settings.lastLicenseValidationDate) {
+                    isLicensed = true
+                    hasCheckedLicense = true
+                    return
+                }
+            }
         }
 
-        do {
-            let valid = try await LicenseService.validate(licenseKey: key, instanceId: instanceId)
-            if valid {
-                settings.lastLicenseValidationDate = Date()
-                try? context.save()
-                isLicensed = true
-            } else {
-                LicenseService.clearLicense(settings: settings, in: context)
-            }
-        } catch {
-            // Network error — check offline grace period
-            if LicenseService.isWithinOfflineGracePeriod(lastValidation: settings.lastLicenseValidationDate) {
-                isLicensed = true
-            } else {
-                // Grace period expired, force re-validation
-            }
+        // 2. No valid license — check trial status
+        let status = TrialService.trialStatus(settings: settings, in: context)
+        switch status {
+        case .notStarted:
+            break
+        case .active(let days):
+            isTrialing = true
+            trialDaysRemaining = days
+        case .expired:
+            trialExpired = true
         }
 
         hasCheckedLicense = true
