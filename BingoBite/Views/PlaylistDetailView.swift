@@ -93,7 +93,6 @@ struct PlaylistDetailView: View {
         .sheet(item: $trackToReplace) { missing in
             TrackReplacementSheet(
                 missingTrack: missing,
-                playlist: playlist,
                 availableSongs: availableReplacementSongs,
                 onReplace: { newSong in
                     PlaylistService.replaceTrack(

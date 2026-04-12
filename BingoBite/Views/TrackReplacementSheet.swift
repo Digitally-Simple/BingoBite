@@ -2,7 +2,6 @@ import SwiftUI
 
 struct TrackReplacementSheet: View {
     let missingTrack: PlaylistService.MissingTrack
-    let playlist: Playlist
     let availableSongs: [Song]
     let onReplace: (Song) -> Void
 
