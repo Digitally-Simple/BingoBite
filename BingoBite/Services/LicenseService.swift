@@ -165,5 +165,5 @@ enum LicenseService {
 }
 
 extension Notification.Name {
-    static let licenseDeactivated = Notification.Name("licenseDeactivated")
+    static let licenseStateChanged = Notification.Name("licenseStateChanged")
 }

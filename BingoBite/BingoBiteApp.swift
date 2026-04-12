@@ -71,7 +71,7 @@ struct BingoBiteApp: App {
             .task {
                 await checkLicense()
             }
-            .onReceive(NotificationCenter.default.publisher(for: .licenseDeactivated)) { _ in
+            .onReceive(NotificationCenter.default.publisher(for: .licenseStateChanged)) { _ in
                 isLicensed = false
                 isTrialing = false
                 hasCheckedLicense = false

@@ -162,7 +162,7 @@ struct SettingsSheet: View {
                     in: modelContext
                 )
                 dismiss()
-                NotificationCenter.default.post(name: .licenseDeactivated, object: nil)
+                NotificationCenter.default.post(name: .licenseStateChanged, object: nil)
             } catch let error as LicenseError {
                 activationError = error.errorDescription
             } catch {

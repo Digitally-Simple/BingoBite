@@ -17,6 +17,8 @@ enum TrialService {
     // MARK: - Public API
 
     static func startTrial(settings: AppSettings, in context: ModelContext) {
+        // Don't overwrite an existing trial
+        if readFromKeychain() != nil || settings.trialStartDate != nil { return }
         let now = Date()
         settings.trialStartDate = now
         try? context.save()

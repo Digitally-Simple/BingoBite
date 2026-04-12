@@ -88,7 +88,7 @@ struct ContentView: View {
             SettingsSheet(
                 trialDaysRemaining: trialDaysRemaining,
                 onLicenseDeactivated: {
-                    NotificationCenter.default.post(name: .licenseDeactivated, object: nil)
+                    NotificationCenter.default.post(name: .licenseStateChanged, object: nil)
                 }
             )
         }
