@@ -19,6 +19,19 @@ enum PlaylistServiceError: LocalizedError {
 }
 
 enum PlaylistService {
+    struct MissingTrack: Identifiable {
+        let index: Int
+        let originalURLString: String
+        var id: Int { index }
+
+        var originalFileName: String {
+            guard let url = URL(string: originalURLString) else {
+                return originalURLString
+            }
+            return url.deletingPathExtension().lastPathComponent
+        }
+    }
+
     // MARK: - Fetch
 
     static func fetchAll(in context: ModelContext) -> [Playlist] {
@@ -90,7 +103,7 @@ enum PlaylistService {
     @MainActor
     static func loadSongs(
         for playlist: Playlist
-    ) async throws -> (songs: [Song], accessedURL: URL) {
+    ) async throws -> (songs: [Song], missingTracks: [MissingTrack], allScanned: [Song], accessedURL: URL) {
         guard !playlist.bookmarkData.isEmpty else {
             throw PlaylistServiceError.bookmarkAccessDenied
         }
@@ -100,9 +113,20 @@ enum PlaylistService {
         }
         do {
             let scanned = try await FolderScannerService.scanForAudio(in: url)
-            let allowed = Set(playlist.songURLStrings)
-            let filtered = scanned.filter { allowed.contains($0.id.absoluteString) }
-            return (filtered, url)
+            let scannedLookup = Dictionary(uniqueKeysWithValues: scanned.map { ($0.id.absoluteString, $0) })
+
+            var songs: [Song] = []
+            var missingTracks: [MissingTrack] = []
+
+            for (index, urlString) in playlist.songURLStrings.enumerated() {
+                if let song = scannedLookup[urlString] {
+                    songs.append(song)
+                } else {
+                    missingTracks.append(MissingTrack(index: index, originalURLString: urlString))
+                }
+            }
+
+            return (songs, missingTracks, scanned, url)
         } catch {
             BookmarkService.stopAccessing(url)
             throw error
