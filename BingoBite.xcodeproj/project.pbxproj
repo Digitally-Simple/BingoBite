@@ -51,6 +51,7 @@
 			isa = PBXGroup;
 			children = (
 				44422FED2F38581400081179 /* BingoBite */,
+				445243792F8ABF4D001512A8 /* Frameworks */,
 				44422FEC2F38581400081179 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -61,6 +62,13 @@
 				44422FEB2F38581400081179 /* BingoBite.app */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		445243792F8ABF4D001512A8 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -275,12 +283,11 @@
 				CODE_SIGN_ENTITLEMENTS = BingoBite/BingoBite.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = 45T5N7MRFT;
-				ENABLE_APP_SANDBOX = YES;
+				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
-				ENABLE_USER_SELECTED_FILES = readwrite;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = BingoBite/Info.plist;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -288,7 +295,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.digitallysimple.BingoBite;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -309,12 +316,11 @@
 				CODE_SIGN_ENTITLEMENTS = BingoBite/BingoBite.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = 45T5N7MRFT;
-				ENABLE_APP_SANDBOX = YES;
+				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
-				ENABLE_USER_SELECTED_FILES = readwrite;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = BingoBite/Info.plist;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -322,7 +328,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.digitallysimple.BingoBite;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
