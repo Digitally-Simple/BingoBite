@@ -6,6 +6,8 @@ struct ContentView: View {
     @Query(sort: \Playlist.name) private var playlists: [Playlist]
     @Query(sort: \BingoGame.creationDate, order: .reverse) private var bingoGames: [BingoGame]
 
+    var trialDaysRemaining: Int?
+
     @State private var sidebarSelection: SidebarSelection? = .allPlaylists
     @State private var showSettings = false
     @State private var showInspector = true
@@ -25,7 +27,7 @@ struct ContentView: View {
 
     var body: some View {
         NavigationSplitView {
-            SidebarView(selection: $sidebarSelection)
+            SidebarView(selection: $sidebarSelection, trialDaysRemaining: trialDaysRemaining, onShowSettings: { showSettings = true })
         } detail: {
             switch sidebarSelection {
             case .allPlaylists, .none:
@@ -84,6 +86,7 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showSettings) {
             SettingsSheet(
+                trialDaysRemaining: trialDaysRemaining,
                 onLicenseDeactivated: {
                     NotificationCenter.default.post(name: .licenseDeactivated, object: nil)
                 }
