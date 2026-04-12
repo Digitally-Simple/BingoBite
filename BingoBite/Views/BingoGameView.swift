@@ -194,7 +194,7 @@ struct BingoGameView: View {
         }
 
         do {
-            let (loaded, url) = try await PlaylistService.loadSongs(for: playlist)
+            let (loaded, _, _, url) = try await PlaylistService.loadSongs(for: playlist)
             songs = loaded
             accessedURL = url
         } catch {
