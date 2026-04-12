@@ -74,7 +74,7 @@ struct LicenseGateView: View {
                             .frame(width: 100)
                     }
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.bordered)
                 .disabled(licenseKeyInput.trimmingCharacters(in: .whitespaces).isEmpty || isActivating)
                 .keyboardShortcut(.defaultAction)
 

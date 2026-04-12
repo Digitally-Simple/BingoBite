@@ -73,6 +73,9 @@ struct BingoBiteApp: App {
             }
             .onReceive(NotificationCenter.default.publisher(for: .licenseDeactivated)) { _ in
                 isLicensed = false
+                isTrialing = false
+                hasCheckedLicense = false
+                Task { await checkLicense() }
             }
         }
         .modelContainer(container)
