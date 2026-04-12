@@ -18,6 +18,12 @@ struct PlaylistDetailView: View {
     @State private var isLoading: Bool = true
     @State private var loadError: String?
     @State private var showCardDesigner: Bool = false
+    @State private var songToEdit: Song?
+    @State private var sortOrder: [KeyPathComparator<Song>] = [KeyPathComparator(\Song.displayTitle)]
+    @State private var searchText: String = ""
+    @State private var missingTracks: [PlaylistService.MissingTrack] = []
+    @State private var trackToReplace: PlaylistService.MissingTrack?
+    @State private var allScannedSongs: [Song] = []
 
     private var uniqueArtistCount: Int {
         Set(songs.compactMap { $0.artist }).count
@@ -31,6 +37,21 @@ struct PlaylistDetailView: View {
         Dictionary(uniqueKeysWithValues: allSoundBytes.map { ($0.songURLString, $0) })
     }
 
+    private var displayedSongs: [Song] {
+        let filtered = searchText.isEmpty ? songs : songs.filter { song in
+            song.displayTitle.localizedCaseInsensitiveContains(searchText) ||
+            song.displayArtist.localizedCaseInsensitiveContains(searchText) ||
+            song.displayAlbum.localizedCaseInsensitiveContains(searchText)
+        }
+        return filtered.sorted(using: sortOrder)
+    }
+
+    /// All songs found in the source folder that are NOT already in the playlist's songURLStrings.
+    private var availableReplacementSongs: [Song] {
+        let usedURLs = Set(playlist.songURLStrings)
+        return allScannedSongs.filter { !usedURLs.contains($0.id.absoluteString) }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             headerSection
@@ -39,9 +60,11 @@ struct PlaylistDetailView: View {
             Divider()
             sourceFolderBar
             Divider()
+            missingTracksBanner
             content
         }
         .navigationTitle(playlist.name)
+        .searchable(text: $searchText, prompt: "Search songs")
         .task(id: playlist.uuid) {
             await loadSongs()
         }
@@ -50,6 +73,38 @@ struct PlaylistDetailView: View {
         }
         .sheet(isPresented: $showCardDesigner) {
             CardDesignerSheet(playlist: playlist, songs: songs)
+        }
+        .sheet(item: $songToEdit) { song in
+            SongMetadataEditorSheet(
+                song: song,
+                onSave: { updatedSong in
+                    if let idx = songs.firstIndex(where: { $0.id == updatedSong.id }) {
+                        songs[idx] = updatedSong
+                        if selectedSong?.id == updatedSong.id {
+                            selectedSong = updatedSong
+                        }
+                    }
+                },
+                onRevert: {
+                    Task { await loadSongs() }
+                }
+            )
+        }
+        .sheet(item: $trackToReplace) { missing in
+            TrackReplacementSheet(
+                missingTrack: missing,
+                playlist: playlist,
+                availableSongs: availableReplacementSongs,
+                onReplace: { newSong in
+                    PlaylistService.replaceTrack(
+                        in: playlist,
+                        atIndex: missing.index,
+                        with: newSong,
+                        in: modelContext
+                    )
+                    Task { await loadSongs() }
+                }
+            )
         }
     }
 
@@ -170,6 +225,24 @@ struct PlaylistDetailView: View {
         .background(.bar)
     }
 
+    // MARK: - Missing Tracks Banner
+
+    @ViewBuilder
+    private var missingTracksBanner: some View {
+        if !missingTracks.isEmpty {
+            HStack(spacing: 8) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange)
+                Text("**\(missingTracks.count) of \(playlist.songCount) tracks missing.** These files may have been renamed or deleted. Replace them to keep your bingo cards complete.")
+                    .font(.caption)
+                Spacer()
+            }
+            .padding(.horizontal)
+            .padding(.vertical, 8)
+            .background(.orange.opacity(0.1))
+        }
+    }
+
     // MARK: - Content
 
     @ViewBuilder
@@ -204,12 +277,18 @@ struct PlaylistDetailView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .padding()
         } else {
-            songsTable
+            VStack(spacing: 0) {
+                songsTable
+                if !missingTracks.isEmpty {
+                    Divider()
+                    missingTracksList
+                }
+            }
         }
     }
 
     private var songsTable: some View {
-        Table(songs, selection: $tableSelection) {
+        Table(displayedSongs, selection: $tableSelection, sortOrder: $sortOrder) {
             TableColumn("") { (song: Song) in
                 Group {
                     if let image = song.artworkImage {
@@ -241,13 +320,9 @@ struct PlaylistDetailView: View {
             }
             .width(30)
             TableColumn("Title", value: \.displayTitle)
-            TableColumn("Artist") { (song: Song) in
-                Text(song.artist ?? "Unknown Artist")
-            }
-            TableColumn("Album") { (song: Song) in
-                Text(song.album ?? "Unknown Album")
-            }
-            TableColumn("Duration") { (song: Song) in
+            TableColumn("Artist", value: \.displayArtist)
+            TableColumn("Album", value: \.displayAlbum)
+            TableColumn("Duration", value: \.sortableDuration) { (song: Song) in
                 Text(song.formattedDuration)
                     .monospacedDigit()
             }
@@ -274,8 +349,50 @@ struct PlaylistDetailView: View {
             }
             .width(ideal: 60)
         }
+        .contextMenu(forSelectionType: Song.ID.self) { items in
+            if let id = items.first, let song = songs.first(where: { $0.id == id }) {
+                Button("Edit Metadata\u{2026}") {
+                    songToEdit = song
+                }
+            }
+        }
         .onChange(of: tableSelection) {
             selectedSong = songs.first { $0.id == tableSelection }
+        }
+    }
+
+    // MARK: - Missing Tracks List
+
+    private var missingTracksList: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(missingTracks) { missing in
+                HStack(spacing: 12) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                        .frame(width: 24, height: 24)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(missing.originalFileName)
+                            .font(.body)
+                            .foregroundStyle(.secondary)
+                            .strikethrough()
+                        Text("Track \(missing.index + 1) — File missing")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
+
+                    Spacer()
+
+                    Button("Replace\u{2026}") {
+                        trackToReplace = missing
+                    }
+                    .buttonStyle(.bordered)
+                }
+                .padding(.horizontal)
+                .padding(.vertical, 6)
+                .background(.orange.opacity(0.05))
+                Divider()
+            }
         }
     }
 
@@ -285,16 +402,31 @@ struct PlaylistDetailView: View {
     private func loadSongs() async {
         isLoading = true
         loadError = nil
+        missingTracks = []
         releaseAccess()
         do {
-            let (loaded, url) = try await PlaylistService.loadSongs(for: playlist)
+            let (loaded, missing, scanned, url) = try await PlaylistService.loadSongs(for: playlist)
             songs = loaded
+            missingTracks = missing
+            allScannedSongs = scanned
             accessedURL = url
+            applyMetadataOverrides()
         } catch {
             loadError = error.localizedDescription
             songs = []
+            missingTracks = []
+            allScannedSongs = []
         }
         isLoading = false
+    }
+
+    private func applyMetadataOverrides() {
+        let overrides = SongMetadataService.fetchAll(in: modelContext)
+        for i in songs.indices {
+            if let override = overrides[songs[i].id.absoluteString] {
+                songs[i] = songs[i].applying(override: override)
+            }
+        }
     }
 
     private func releaseAccess() {
