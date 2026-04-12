@@ -163,7 +163,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -e\nSRC=\"${SRCROOT}/Vendor\"\nDST=\"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Resources/bin\"\nmkdir -p \"$DST\"\ncp -f \"$SRC/ffprobe/ffprobe\" \"$DST/ffprobe\"\nchmod +x \"$DST/ffprobe\"\nIDENTITY=\"${EXPANDED_CODE_SIGN_IDENTITY:-${CODE_SIGN_IDENTITY:--}}\"\nENT=\"${SRCROOT}/BingoBite/BingoBite.entitlements\"\ncodesign --force --sign \"$IDENTITY\" --options runtime --timestamp=none --entitlements \"$ENT\" \"$DST/ffprobe\"\n";
+			shellScript = "set -e\nSRC=\"${SRCROOT}/Vendor\"\nDST=\"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Resources/bin\"\nmkdir -p \"$DST\"\ncp -f \"$SRC/ffmpeg/ffmpeg\" \"$DST/ffmpeg\"\nchmod +x \"$DST/ffmpeg\"\nIDENTITY=\"${EXPANDED_CODE_SIGN_IDENTITY:-${CODE_SIGN_IDENTITY:--}}\"\nENT=\"${SRCROOT}/BingoBite/BingoBite.entitlements\"\ncodesign --force --sign \"$IDENTITY\" --options runtime --timestamp=none --entitlements \"$ENT\" \"$DST/ffmpeg\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 

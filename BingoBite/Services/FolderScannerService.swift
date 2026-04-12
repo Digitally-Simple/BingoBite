@@ -61,16 +61,17 @@ enum FolderScannerService {
 
     // MARK: - ffprobe metadata
 
-    /// Run ffprobe to extract all tags as a flat [String: String] dictionary.
+    /// Run ffmpeg to extract all tags as a flat [String: String] dictionary.
+    /// Uses `-f ffmetadata` output which gives `key=value` lines.
     /// Returns empty dict on failure (non-fatal — song still gets basic info).
     private static func probeTags(for fileURL: URL) -> [String: String] {
         let proc = Process()
-        proc.executableURL = BinaryLocator.ffprobe
+        proc.executableURL = BinaryLocator.ffmpeg
         proc.arguments = [
+            "-i", fileURL.path,
+            "-f", "ffmetadata",
             "-v", "quiet",
-            "-print_format", "json",
-            "-show_entries", "format_tags",
-            fileURL.path
+            "pipe:1"
         ]
         let outPipe = Pipe()
         proc.standardOutput = outPipe
@@ -78,25 +79,58 @@ enum FolderScannerService {
 
         do {
             try proc.run()
-            proc.waitUntilExit()
         } catch {
             return [:]
         }
 
         let data = outPipe.fileHandleForReading.readDataToEndOfFile()
-        guard !data.isEmpty else { return [:] }
+        proc.waitUntilExit()
 
-        struct FFProbeOutput: Decodable {
-            struct Format: Decodable {
-                let tags: [String: String]?
-            }
-            let format: Format?
-        }
-
-        guard let output = try? JSONDecoder().decode(FFProbeOutput.self, from: data) else {
+        guard let output = String(data: data, encoding: .utf8), !output.isEmpty else {
             return [:]
         }
-        return output.format?.tags ?? [:]
+        return parseFFMetadata(output)
+    }
+
+    /// Parse ffmetadata format: `;FFMETADATA1` header, then `key=value` lines.
+    /// Handles ffmetadata escaping: `\=`, `\;`, `\#`, `\\`, `\n` (literal backslash-n for newlines).
+    private static func parseFFMetadata(_ text: String) -> [String: String] {
+        var tags: [String: String] = [:]
+        var currentKey: String?
+        var currentValue: String = ""
+
+        for line in text.components(separatedBy: "\n") {
+            // Skip the header and comment lines
+            if line.hasPrefix(";") || line.hasPrefix("#") { continue }
+            // Skip section headers like [CHAPTER]
+            if line.hasPrefix("[") { continue }
+
+            if let eqRange = line.range(of: "=") {
+                // Save previous key-value if any
+                if let key = currentKey {
+                    tags[key] = unescapeFFMetadata(currentValue)
+                }
+                currentKey = String(line[line.startIndex..<eqRange.lowerBound])
+                currentValue = String(line[eqRange.upperBound...])
+            } else if currentKey != nil {
+                // Continuation line (multiline value)
+                currentValue += "\n" + line
+            }
+        }
+        // Save last key-value
+        if let key = currentKey {
+            tags[key] = unescapeFFMetadata(currentValue)
+        }
+        return tags
+    }
+
+    /// Unescape ffmetadata special characters.
+    private static func unescapeFFMetadata(_ value: String) -> String {
+        value
+            .replacingOccurrences(of: "\\=", with: "=")
+            .replacingOccurrences(of: "\\;", with: ";")
+            .replacingOccurrences(of: "\\#", with: "#")
+            .replacingOccurrences(of: "\\\\", with: "\\")
     }
 
     /// Decode a JSON-encoded string value into a typed Swift object.

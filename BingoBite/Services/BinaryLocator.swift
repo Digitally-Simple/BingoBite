@@ -1,9 +1,9 @@
 import Foundation
 
-/// Resolves the bundled `ffprobe` binary shipped inside the app's
+/// Resolves the bundled `ffmpeg` binary shipped inside the app's
 /// `Contents/Resources/bin` directory.
 enum BinaryLocator {
-    static let ffprobe: URL = locate("ffprobe")
+    static let ffmpeg: URL = locate("ffmpeg")
 
     private static func locate(_ name: String) -> URL {
         guard let url = Bundle.main.url(
@@ -11,7 +11,7 @@ enum BinaryLocator {
             withExtension: nil,
             subdirectory: "bin"
         ) else {
-            fatalError("Bundled binary missing: \(name). Add ffprobe to Resources/bin and ensure the 'Copy & Sign' build phase runs.")
+            fatalError("Bundled binary missing: \(name). Add ffmpeg to Resources/bin and ensure the 'Copy & Sign' build phase runs.")
         }
         return url
     }
