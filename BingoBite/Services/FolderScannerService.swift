@@ -19,24 +19,39 @@ enum FolderScannerService {
             let resourceValues = try fileURL.resourceValues(forKeys: [.fileSizeKey])
             let fileSize = Int64(resourceValues.fileSize ?? 0)
 
+            // AVFoundation: artwork + duration only
             let asset = AVURLAsset(url: fileURL)
-            let metadata = try await asset.load(.commonMetadata)
             let duration = try await asset.load(.duration)
+            let commonMetadata = try await asset.load(.commonMetadata)
+            let artwork = await artworkData(in: commonMetadata)
 
-            let artist = await metadataValue(for: .commonKeyArtist, in: metadata)
-            let title = await metadataValue(for: .commonKeyTitle, in: metadata)
-            let album = await metadataValue(for: .commonKeyAlbumName, in: metadata)
-            let artworkData = await artworkData(in: metadata)
+            // ffprobe: all text metadata as flat key-value pairs
+            let tags = probeTags(for: fileURL)
 
             let song = Song(
                 id: fileURL,
                 fileName: fileURL.deletingPathExtension().lastPathComponent,
                 fileSize: fileSize,
                 duration: duration.seconds.isNaN ? nil : duration.seconds,
-                artist: artist,
-                title: title,
-                album: album,
-                artworkData: artworkData
+                artist: tags["artist"],
+                title: tags["title"],
+                album: tags["album"],
+                artworkData: artwork,
+                genre: tags["genre"],
+                year: extractYear(from: tags["date"]),
+                comments: tags["USER_NOTES"],
+                songDescription: tags["DESCRIPTION"],
+                annotations: decodeJSON([AnnotationFact].self, from: tags["ANNOTATIONS"]),
+                featuredArtists: decodeJSON([String].self, from: tags["FEATURED_ARTISTS"]),
+                producerArtists: decodeJSON([String].self, from: tags["PRODUCERS"]),
+                writerArtists: decodeJSON([String].self, from: tags["WRITERS"]),
+                credits: decodeJSON([CreditEntry].self, from: tags["CREDITS"]),
+                recordingLocation: tags["RECORDING_LOCATION"],
+                language: tags["language"],
+                releaseDate: tags["date"],
+                mediaLinks: decodeJSON([MediaLink].self, from: tags["MEDIA_LINKS"]),
+                songRelationships: decodeJSON([SongRelationshipEntry].self, from: tags["RELATIONSHIPS"]),
+                geniusURL: tags["GENIUS_URL"].flatMap { URL(string: $0) }
             )
             songs.append(song)
         }
@@ -44,28 +59,63 @@ enum FolderScannerService {
         return songs.sorted { $0.displayTitle.localizedCaseInsensitiveCompare($1.displayTitle) == .orderedAscending }
     }
 
-    private static func metadataValue(for key: AVMetadataKey, in metadata: [AVMetadataItem]) async -> String? {
-        let items = AVMetadataItem.metadataItems(from: metadata, filteredByIdentifier: .commonIdentifier(from: key))
-        guard let item = items.first else { return nil }
-        let value = try? await item.load(.stringValue)
-        return value
+    // MARK: - ffprobe metadata
+
+    /// Run ffprobe to extract all tags as a flat [String: String] dictionary.
+    /// Returns empty dict on failure (non-fatal — song still gets basic info).
+    private static func probeTags(for fileURL: URL) -> [String: String] {
+        let proc = Process()
+        proc.executableURL = BinaryLocator.ffprobe
+        proc.arguments = [
+            "-v", "quiet",
+            "-print_format", "json",
+            "-show_entries", "format_tags",
+            fileURL.path
+        ]
+        let outPipe = Pipe()
+        proc.standardOutput = outPipe
+        proc.standardError = Pipe()
+
+        do {
+            try proc.run()
+            proc.waitUntilExit()
+        } catch {
+            return [:]
+        }
+
+        let data = outPipe.fileHandleForReading.readDataToEndOfFile()
+        guard !data.isEmpty else { return [:] }
+
+        struct FFProbeOutput: Decodable {
+            struct Format: Decodable {
+                let tags: [String: String]?
+            }
+            let format: Format?
+        }
+
+        guard let output = try? JSONDecoder().decode(FFProbeOutput.self, from: data) else {
+            return [:]
+        }
+        return output.format?.tags ?? [:]
     }
+
+    /// Decode a JSON-encoded string value into a typed Swift object.
+    private static func decodeJSON<T: Decodable>(_ type: T.Type, from value: String?) -> T? {
+        guard let value, let data = value.data(using: .utf8) else { return nil }
+        return try? JSONDecoder().decode(T.self, from: data)
+    }
+
+    /// Extract 4-digit year from a date string like "2023-05-15".
+    private static func extractYear(from date: String?) -> String? {
+        guard let date, date.count >= 4 else { return nil }
+        return String(date.prefix(4))
+    }
+
+    // MARK: - AVFoundation (artwork only)
 
     private static func artworkData(in metadata: [AVMetadataItem]) async -> Data? {
         let items = AVMetadataItem.metadataItems(from: metadata, filteredByIdentifier: .commonIdentifierArtwork)
         guard let item = items.first else { return nil }
-        let value = try? await item.load(.dataValue)
-        return value
-    }
-}
-
-private extension AVMetadataIdentifier {
-    static func commonIdentifier(from key: AVMetadataKey) -> AVMetadataIdentifier {
-        switch key {
-        case .commonKeyArtist: return .commonIdentifierArtist
-        case .commonKeyTitle: return .commonIdentifierTitle
-        case .commonKeyAlbumName: return .commonIdentifierAlbumName
-        default: return AVMetadataIdentifier(rawValue: key.rawValue)
-        }
+        return try? await item.load(.dataValue)
     }
 }
