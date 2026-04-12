@@ -9,7 +9,9 @@ struct LicenseGateView: View {
     @State private var isActivating = false
     @State private var errorMessage: String?
 
+    var trialExpired: Bool
     var onActivated: () -> Void
+    var onTrialStarted: () -> Void
 
     private var settings: AppSettings {
         if let existing = settingsItems.first {
@@ -32,10 +34,31 @@ struct LicenseGateView: View {
                 .font(.largeTitle)
                 .fontWeight(.bold)
 
-            Text("Enter your license key to get started.")
-                .foregroundStyle(.secondary)
+            if trialExpired {
+                Text("Your free trial has ended. Enter a license key to continue.")
+                    .foregroundStyle(.secondary)
+            } else if settings.licenseKey.isEmpty {
+                Text("Start your 14-day free trial, or enter a license key.")
+                    .foregroundStyle(.secondary)
+            } else {
+                Text("Enter your license key to get started.")
+                    .foregroundStyle(.secondary)
+            }
 
             VStack(spacing: 12) {
+                if !trialExpired && settings.licenseKey.isEmpty {
+                    Button(action: startTrial) {
+                        Text("Start Free Trial")
+                            .frame(width: 200)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+
+                    Divider()
+                        .frame(width: 360)
+                        .padding(.vertical, 4)
+                }
+
                 TextField("License Key", text: $licenseKeyInput)
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 360)
@@ -63,20 +86,20 @@ struct LicenseGateView: View {
                 }
             }
 
-            Link("Don't have a license key? Purchase BingoBite",
-                 destination: URL(string: "https://test.store.dodopayments.com/bingobyte")!)
-                .font(.caption)
-
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
-            // Pre-fill if returning after grace period expiry
             let stored = settings.licenseKey
             if !stored.isEmpty {
                 licenseKeyInput = stored
             }
         }
+    }
+
+    private func startTrial() {
+        TrialService.startTrial(settings: settings, in: modelContext)
+        onTrialStarted()
     }
 
     private func activateLicense() {
