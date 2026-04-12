@@ -40,6 +40,34 @@ struct BingoGameInfoView: View {
                     .padding(.horizontal, 24)
 
                 metadataSection(song)
+
+                if hasSongFacts(song) {
+                    Divider()
+                        .padding(.horizontal, 24)
+
+                    songFactsSection(song)
+                }
+
+                if hasCredits(song) {
+                    Divider()
+                        .padding(.horizontal, 24)
+
+                    creditsSection(song)
+                }
+
+                if hasRelationships(song) {
+                    Divider()
+                        .padding(.horizontal, 24)
+
+                    relationshipsSection(song)
+                }
+
+                if hasMediaLinks(song) {
+                    Divider()
+                        .padding(.horizontal, 24)
+
+                    mediaLinksSection(song)
+                }
             }
             .padding(.vertical)
         }
@@ -296,6 +324,31 @@ struct BingoGameInfoView: View {
                 Divider().padding(.leading, 24)
                 metadataGridRow(label: "File", value: song.fileName)
 
+                if let featured = song.featuredArtists, !featured.isEmpty {
+                    Divider().padding(.leading, 24)
+                    metadataGridRow(label: "Featured", value: featured.joined(separator: ", "))
+                }
+                if let producers = song.producerArtists, !producers.isEmpty {
+                    Divider().padding(.leading, 24)
+                    metadataGridRow(label: "Producers", value: producers.joined(separator: ", "))
+                }
+                if let writers = song.writerArtists, !writers.isEmpty {
+                    Divider().padding(.leading, 24)
+                    metadataGridRow(label: "Writers", value: writers.joined(separator: ", "))
+                }
+                if let language = song.language, !language.isEmpty {
+                    Divider().padding(.leading, 24)
+                    metadataGridRow(label: "Language", value: language)
+                }
+                if let location = song.recordingLocation, !location.isEmpty {
+                    Divider().padding(.leading, 24)
+                    metadataGridRow(label: "Recorded", value: location)
+                }
+                if let releaseDate = song.releaseDate, !releaseDate.isEmpty {
+                    Divider().padding(.leading, 24)
+                    metadataGridRow(label: "Released", value: releaseDate)
+                }
+
                 if hasSoundByte {
                     Divider().padding(.leading, 24)
                     metadataGridRow(label: "Clip Start", value: Self.formatTime(editingStartTime))
@@ -323,6 +376,267 @@ struct BingoGameInfoView: View {
         .padding(.vertical, 6)
     }
 
+    // MARK: - Song Facts Section
+
+    private func hasSongFacts(_ song: Song) -> Bool {
+        let desc = song.songDescription
+        let annotations = song.annotations ?? []
+        return (desc != nil && !desc!.isEmpty) || !annotations.isEmpty
+    }
+
+    @ViewBuilder
+    private func songFactsSection(_ song: Song) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Song Facts")
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 24)
+                .padding(.top, 12)
+
+            VStack(alignment: .leading, spacing: 10) {
+                if let desc = song.songDescription, !desc.isEmpty {
+                    DisclosureGroup("About This Song") {
+                        Text(desc)
+                            .font(.caption)
+                            .textSelection(.enabled)
+                            .padding(.top, 4)
+                    }
+                    .font(.caption.weight(.medium))
+                    .padding(.horizontal, 24)
+                }
+
+                let annotations = song.annotations ?? []
+                let verified = annotations.filter(\.verified)
+                let accepted = annotations.filter { !$0.verified }
+
+                if !verified.isEmpty {
+                    DisclosureGroup("Artist Annotations (\(verified.count))") {
+                        VStack(alignment: .leading, spacing: 12) {
+                            ForEach(Array(verified.enumerated()), id: \.offset) { _, fact in
+                                annotationFactView(fact)
+                            }
+                        }
+                        .padding(.top, 4)
+                    }
+                    .font(.caption.weight(.medium))
+                    .padding(.horizontal, 24)
+                }
+
+                if !accepted.isEmpty {
+                    DisclosureGroup("Top Annotations (\(accepted.count))") {
+                        VStack(alignment: .leading, spacing: 12) {
+                            ForEach(Array(accepted.enumerated()), id: \.offset) { _, fact in
+                                annotationFactView(fact)
+                            }
+                        }
+                        .padding(.top, 4)
+                    }
+                    .font(.caption.weight(.medium))
+                    .padding(.horizontal, 24)
+                }
+
+            }
+            .padding(.bottom, 12)
+        }
+    }
+
+    private func annotationFactView(_ fact: AnnotationFact) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("\"\(fact.fragment.prefix(120))\"")
+                .font(.caption)
+                .italic()
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+
+            Text(fact.body)
+                .font(.caption)
+                .textSelection(.enabled)
+
+            HStack(spacing: 6) {
+                Text(fact.authors)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                if fact.verified {
+                    Label("Verified", systemImage: "checkmark.seal.fill")
+                        .font(.caption2)
+                        .foregroundStyle(.blue)
+                } else {
+                    Text("\(fact.votes) votes")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Divider()
+        }
+    }
+
+    // MARK: - Credits Section
+
+    private func hasCredits(_ song: Song) -> Bool {
+        guard let credits = song.credits else { return false }
+        return !credits.isEmpty
+    }
+
+    @ViewBuilder
+    private func creditsSection(_ song: Song) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Credits")
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 24)
+                .padding(.top, 12)
+
+            DisclosureGroup("Performance Credits (\(song.credits?.count ?? 0))") {
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(Array((song.credits ?? []).enumerated()), id: \.offset) { _, credit in
+                        HStack(alignment: .top, spacing: 6) {
+                            Text(credit.role + ":")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .frame(minWidth: 80, alignment: .trailing)
+                            Text(credit.artists.joined(separator: ", "))
+                                .font(.caption)
+                                .textSelection(.enabled)
+                        }
+                    }
+                }
+                .padding(.top, 4)
+            }
+            .font(.caption.weight(.medium))
+            .padding(.horizontal, 24)
+            .padding(.bottom, 12)
+        }
+    }
+
+    // MARK: - Song Relationships Section
+
+    private func hasRelationships(_ song: Song) -> Bool {
+        guard let relationships = song.songRelationships else { return false }
+        return !relationships.isEmpty
+    }
+
+    @ViewBuilder
+    private func relationshipsSection(_ song: Song) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Song Relationships")
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 24)
+                .padding(.top, 12)
+
+            DisclosureGroup("Connections (\(song.songRelationships?.count ?? 0))") {
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(Array((song.songRelationships ?? []).enumerated()), id: \.offset) { _, rel in
+                        HStack(alignment: .top, spacing: 6) {
+                            Text(Self.formatRelationshipType(rel.type) + ":")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .frame(minWidth: 80, alignment: .trailing)
+                            Text("\"\(rel.title)\" by \(rel.artist)")
+                                .font(.caption)
+                                .textSelection(.enabled)
+                        }
+                    }
+                }
+                .padding(.top, 4)
+            }
+            .font(.caption.weight(.medium))
+            .padding(.horizontal, 24)
+            .padding(.bottom, 12)
+        }
+    }
+
+    private static func formatRelationshipType(_ type: String) -> String {
+        switch type {
+        case "samples":           "Samples"
+        case "sampled_in":        "Sampled in"
+        case "interpolates":      "Interpolates"
+        case "interpolated_by":   "Interpolated by"
+        case "cover_of":          "Cover of"
+        case "covered_by":        "Covered by"
+        case "remix_of":          "Remix of"
+        case "remixed_by":        "Remixed by"
+        case "live_version_of":   "Live version of"
+        case "performed_live_as": "Performed live as"
+        default:                  type.replacingOccurrences(of: "_", with: " ").capitalized
+        }
+    }
+
+    // MARK: - Media Links Section
+
+    private func hasMediaLinks(_ song: Song) -> Bool {
+        let hasLinks = song.mediaLinks != nil && !song.mediaLinks!.isEmpty
+        let hasGenius = song.geniusURL != nil
+        return hasLinks || hasGenius
+    }
+
+    @ViewBuilder
+    private func mediaLinksSection(_ song: Song) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Links")
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 24)
+                .padding(.top, 12)
+
+            VStack(alignment: .leading, spacing: 8) {
+                if let links = song.mediaLinks, !links.isEmpty {
+                    WrappingHStack(spacing: 8) {
+                        ForEach(Array(links.enumerated()), id: \.offset) { _, link in
+                            Link(destination: link.url) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: Self.iconForProvider(link.provider))
+                                    Text(Self.displayNameForProvider(link.provider))
+                                }
+                                .font(.caption)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 5)
+                                .background(Color.secondary.opacity(0.1), in: Capsule())
+                            }
+                        }
+                    }
+                }
+
+                if let geniusURL = song.geniusURL {
+                    Link(destination: geniusURL) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.up.right.square")
+                            Text("View on Genius")
+                        }
+                        .font(.caption)
+                    }
+                }
+            }
+            .padding(.horizontal, 24)
+            .padding(.bottom, 12)
+        }
+    }
+
+    private static func iconForProvider(_ provider: String) -> String {
+        switch provider.lowercased() {
+        case "spotify":      "arrow.up.right.square"
+        case "apple_music":  "arrow.up.right.square"
+        case "youtube":      "play.rectangle"
+        case "soundcloud":   "arrow.up.right.square"
+        default:             "link"
+        }
+    }
+
+    private static func displayNameForProvider(_ provider: String) -> String {
+        switch provider.lowercased() {
+        case "spotify":      "Spotify"
+        case "apple_music":  "Apple Music"
+        case "youtube":      "YouTube"
+        case "soundcloud":   "SoundCloud"
+        default:             provider.replacingOccurrences(of: "_", with: " ").capitalized
+        }
+    }
+
     // MARK: - Helpers
 
     private func loadSoundByte() {
@@ -347,5 +661,49 @@ struct BingoGameInfoView: View {
         let minutes = Int(time) / 60
         let seconds = Int(time) % 60
         return String(format: "%d:%02d", minutes, seconds)
+    }
+}
+
+// MARK: - Flow layout for media link pills
+
+private struct WrappingHStack: Layout {
+    var spacing: CGFloat = 8
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let result = layout(in: proposal.width ?? 0, subviews: subviews)
+        return result.size
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let result = layout(in: bounds.width, subviews: subviews)
+        for (index, origin) in result.origins.enumerated() {
+            subviews[index].place(
+                at: CGPoint(x: bounds.minX + origin.x, y: bounds.minY + origin.y),
+                proposal: .unspecified
+            )
+        }
+    }
+
+    private func layout(in width: CGFloat, subviews: Subviews) -> (size: CGSize, origins: [CGPoint]) {
+        var origins: [CGPoint] = []
+        var x: CGFloat = 0
+        var y: CGFloat = 0
+        var rowHeight: CGFloat = 0
+        var maxWidth: CGFloat = 0
+
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if x + size.width > width, x > 0 {
+                x = 0
+                y += rowHeight + spacing
+                rowHeight = 0
+            }
+            origins.append(CGPoint(x: x, y: y))
+            rowHeight = max(rowHeight, size.height)
+            x += size.width + spacing
+            maxWidth = max(maxWidth, x - spacing)
+        }
+
+        return (CGSize(width: maxWidth, height: y + rowHeight), origins)
     }
 }
