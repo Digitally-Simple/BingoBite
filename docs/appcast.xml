@@ -7,6 +7,27 @@
     <language>en</language>
 
     <item>
+      <title>Version 1.4.0</title>
+      <sparkle:version>10400</sparkle:version>
+      <sparkle:shortVersionString>1.4.0</sparkle:shortVersionString>
+      <description><![CDATA[
+        <h2>What's New</h2>
+        <ul>
+          <li>Bug fixes and improvements</li>
+Some fixes and testing.!</li>
+Test2!</li>
+        </ul>
+      ]]></description>
+      <pubDate>Sun, 12 Apr 2026 17:58:42 +0000</pubDate>
+      <enclosure
+        url="https://github.com/Digitally-Simple/BingoBite/releases/download/v1.4.0/BingoBite-1.4.0.zip"
+        length="2013056"
+        type="application/octet-stream"
+        sparkle:edSignature="tX/wT0eEQR+ghif5XfP451jXAYEiL1/Bimoh1Z0kvLAs5StHKCsOE8k+F5Slbs46HGa86YUQHfo8Ep+FPnoNDQ=="
+      />
+    </item>
+
+    <item>
       <title>Version 1.2.0</title>
       <sparkle:version>10200</sparkle:version>
       <sparkle:shortVersionString>1.2.0</sparkle:shortVersionString>
