@@ -133,6 +133,41 @@ enum PlaylistService {
         }
     }
 
+    // MARK: - Track replacement
+
+    /// Replaces a missing track's URL at the given index in the playlist's songURLStrings.
+    /// Deletes any SongMetadataOverride and SoundByte associated with the old URL.
+    @MainActor
+    static func replaceTrack(
+        in playlist: Playlist,
+        atIndex index: Int,
+        with newSong: Song,
+        in context: ModelContext
+    ) {
+        let oldURLString = playlist.songURLStrings[index]
+
+        // Swap the URL
+        playlist.songURLStrings[index] = newSong.id.absoluteString
+
+        // Delete old SongMetadataOverride
+        let overrideDescriptor = FetchDescriptor<SongMetadataOverride>(
+            predicate: #Predicate { $0.songURLString == oldURLString }
+        )
+        if let oldOverride = try? context.fetch(overrideDescriptor).first {
+            context.delete(oldOverride)
+        }
+
+        // Delete old SoundByte
+        let soundByteDescriptor = FetchDescriptor<SoundByte>(
+            predicate: #Predicate { $0.songURLString == oldURLString }
+        )
+        if let oldSoundByte = try? context.fetch(soundByteDescriptor).first {
+            context.delete(oldSoundByte)
+        }
+
+        try? context.save()
+    }
+
     // MARK: - Card helpers
 
     static func bingoCards(from playlist: Playlist) -> [BingoCard] {
