@@ -22,92 +22,116 @@ struct BingoGameInfoView: View {
         .onChange(of: song) { loadSoundByte() }
     }
 
+    // MARK: - Card Helpers
+
+    @ViewBuilder
+    private func sectionCard<Content: View>(
+        header: String? = nil,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if let header {
+                Text(header)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .textCase(.uppercase)
+                    .tracking(0.5)
+                    .padding(.horizontal, 4)
+            }
+
+            VStack(spacing: 0) {
+                content()
+            }
+            .background(Color(.controlBackgroundColor))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+    }
+
+    @ViewBuilder
+    private func cardRow(label: String, value: String) -> some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text(label)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Text(value)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+            .font(.callout)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+
+            Divider()
+                .padding(.leading, 16)
+        }
+    }
+
     // MARK: - Song Detail
 
     @ViewBuilder
     private func songDetail(_ song: Song) -> some View {
         ScrollView {
-            VStack(spacing: 0) {
-                heroSection(song)
-                    .padding(.bottom, 12)
-
-                Divider()
-                    .padding(.horizontal, 24)
-
-                soundByteSection(song)
-
-                Divider()
-                    .padding(.horizontal, 24)
-
-                metadataSection(song)
+            VStack(spacing: 12) {
+                heroCard(song)
+                soundByteCard(song)
+                detailsCard(song)
 
                 if hasSongFacts(song) {
-                    Divider()
-                        .padding(.horizontal, 24)
-
-                    songFactsSection(song)
+                    songFactsCard(song)
                 }
-
                 if hasCredits(song) {
-                    Divider()
-                        .padding(.horizontal, 24)
-
-                    creditsSection(song)
+                    creditsCard(song)
                 }
-
                 if hasRelationships(song) {
-                    Divider()
-                        .padding(.horizontal, 24)
-
-                    relationshipsSection(song)
+                    connectionsCard(song)
                 }
-
                 if hasMediaLinks(song) {
-                    Divider()
-                        .padding(.horizontal, 24)
-
-                    mediaLinksSection(song)
+                    linksCard(song)
                 }
             }
-            .padding(.vertical)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 16)
+            .disclosureGroupStyle(TappableDisclosureGroupStyle())
         }
+        .background(Color(.windowBackgroundColor))
     }
 
-    // MARK: - Hero Section
+    // MARK: - Hero Card
 
     @ViewBuilder
-    private func heroSection(_ song: Song) -> some View {
-        HStack(alignment: .top, spacing: 24) {
-            // Artwork
-            artworkView(song)
-                .frame(width: 300, height: 300)
+    private func heroCard(_ song: Song) -> some View {
+        sectionCard {
+            HStack(alignment: .top, spacing: 16) {
+                artworkView(song)
+                    .frame(width: 140, height: 140)
 
-            // Title, artist, and playback controls
-            VStack(alignment: .leading, spacing: 8) {
-                Text(song.displayTitle)
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
-                    .lineLimit(3)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(song.displayTitle)
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .lineLimit(3)
 
-                Text(song.artist ?? "Unknown Artist")
-                    .font(.title2)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                    Text(song.artist ?? "Unknown Artist")
+                        .font(.body)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
 
-                Text(song.album ?? "Unknown Album")
-                    .font(.title3)
-                    .foregroundStyle(.tertiary)
-                    .lineLimit(1)
+                    Text(song.album ?? "Unknown Album")
+                        .font(.subheadline)
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
 
-                Spacer()
+                    Spacer()
 
-                if audioPlayer.currentSong == song {
-                    playbackControls(song)
+                    if audioPlayer.currentSong == song {
+                        playbackControls(song)
+                    }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(16)
         }
-        .padding(.horizontal, 24)
     }
 
     @ViewBuilder
@@ -122,7 +146,7 @@ struct BingoGameInfoView: View {
                     RoundedRectangle(cornerRadius: 12)
                         .fill(.quaternary)
                     Image(systemName: "music.note")
-                        .font(.system(size: 64))
+                        .font(.system(size: 48))
                         .foregroundStyle(.secondary)
                 }
                 .aspectRatio(1, contentMode: .fit)
@@ -183,7 +207,7 @@ struct BingoGameInfoView: View {
             .monospacedDigit()
             .foregroundStyle(.secondary)
 
-            HStack(spacing: 24) {
+            HStack(spacing: 20) {
                 Button {
                     audioPlayer.skipBackward()
                 } label: {
@@ -198,7 +222,7 @@ struct BingoGameInfoView: View {
                     audioPlayer.togglePlayPause()
                 } label: {
                     Image(systemName: audioPlayer.isPlaying ? "pause.circle.fill" : "play.circle.fill")
-                        .font(.system(size: 36))
+                        .font(.system(size: 32))
                 }
                 .buttonStyle(.borderless)
                 .help(audioPlayer.isPlaying ? "Pause" : "Play")
@@ -212,37 +236,31 @@ struct BingoGameInfoView: View {
                 .buttonStyle(.borderless)
                 .disabled(!audioPlayer.canSkipForward)
                 .help("Next")
+
+                Button {
+                    audioPlayer.stop()
+                } label: {
+                    Image(systemName: "stop.fill")
+                        .font(.body)
+                }
+                .buttonStyle(.borderless)
+                .help("Stop")
             }
             .padding(.top, 4)
-
-            Button {
-                audioPlayer.stop()
-            } label: {
-                Image(systemName: "stop.fill")
-                    .font(.caption)
-            }
-            .buttonStyle(.borderless)
-            .help("Stop")
-            .padding(.top, 2)
         }
     }
 
-    // MARK: - Sound Byte Section
+    // MARK: - Sound Byte Card
 
     @ViewBuilder
-    private func soundByteSection(_ song: Song) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Sound Byte")
-                .font(.subheadline)
-                .fontWeight(.semibold)
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 24)
-                .padding(.top, 12)
-
-            Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 8) {
-                GridRow {
+    private func soundByteCard(_ song: Song) -> some View {
+        sectionCard(header: "Sound Byte") {
+            // Start row
+            VStack(spacing: 0) {
+                HStack {
                     Text("Start")
                         .foregroundStyle(.secondary)
+                    Spacer()
                     Text(Self.formatTime(editingStartTime))
                         .monospacedDigit()
                     Button("Set to Now") {
@@ -251,10 +269,20 @@ struct BingoGameInfoView: View {
                     .controlSize(.small)
                     .disabled(audioPlayer.currentSong != song)
                 }
+                .font(.callout)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
 
-                GridRow {
+                Divider()
+                    .padding(.leading, 16)
+            }
+
+            // End row
+            VStack(spacing: 0) {
+                HStack {
                     Text("End")
                         .foregroundStyle(.secondary)
+                    Spacer()
                     Text(Self.formatTime(editingEndTime))
                         .monospacedDigit()
                     Button("Set to Now") {
@@ -263,11 +291,16 @@ struct BingoGameInfoView: View {
                     .controlSize(.small)
                     .disabled(audioPlayer.currentSong != song)
                 }
-            }
-            .font(.callout)
-            .padding(.horizontal, 24)
+                .font(.callout)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
 
-            HStack(spacing: 8) {
+                Divider()
+                    .padding(.leading, 16)
+            }
+
+            // Action buttons
+            HStack(spacing: 12) {
                 Button("Save") {
                     SoundByteService.save(
                         for: song,
@@ -292,91 +325,56 @@ struct BingoGameInfoView: View {
                         hasSoundByte = false
                     }
                 }
+
+                Spacer()
             }
+            .buttonStyle(.borderless)
             .controlSize(.small)
-            .padding(.horizontal, 24)
-            .padding(.bottom, 12)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
         }
     }
 
-    // MARK: - Metadata Section
+    // MARK: - Details Card
 
     @ViewBuilder
-    private func metadataSection(_ song: Song) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Details")
-                .font(.subheadline)
-                .fontWeight(.semibold)
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 24)
-                .padding(.top, 12)
+    private func detailsCard(_ song: Song) -> some View {
+        sectionCard(header: "Details") {
+            cardRow(label: "Title", value: song.displayTitle)
+            cardRow(label: "Artist", value: song.artist ?? "Unknown Artist")
+            cardRow(label: "Album", value: song.album ?? "Unknown Album")
+            cardRow(label: "Duration", value: song.formattedDuration)
+            cardRow(label: "Size", value: song.formattedFileSize)
+            cardRow(label: "File", value: song.fileName)
 
-            Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 0) {
-                metadataGridRow(label: "Title", value: song.displayTitle)
-                Divider().padding(.leading, 24)
-                metadataGridRow(label: "Artist", value: song.artist ?? "Unknown Artist")
-                Divider().padding(.leading, 24)
-                metadataGridRow(label: "Album", value: song.album ?? "Unknown Album")
-                Divider().padding(.leading, 24)
-                metadataGridRow(label: "Duration", value: song.formattedDuration)
-                Divider().padding(.leading, 24)
-                metadataGridRow(label: "Size", value: song.formattedFileSize)
-                Divider().padding(.leading, 24)
-                metadataGridRow(label: "File", value: song.fileName)
-
-                if let featured = song.featuredArtists, !featured.isEmpty {
-                    Divider().padding(.leading, 24)
-                    metadataGridRow(label: "Featured", value: featured.joined(separator: ", "))
-                }
-                if let producers = song.producerArtists, !producers.isEmpty {
-                    Divider().padding(.leading, 24)
-                    metadataGridRow(label: "Producers", value: producers.joined(separator: ", "))
-                }
-                if let writers = song.writerArtists, !writers.isEmpty {
-                    Divider().padding(.leading, 24)
-                    metadataGridRow(label: "Writers", value: writers.joined(separator: ", "))
-                }
-                if let language = song.language, !language.isEmpty {
-                    Divider().padding(.leading, 24)
-                    metadataGridRow(label: "Language", value: language)
-                }
-                if let location = song.recordingLocation, !location.isEmpty {
-                    Divider().padding(.leading, 24)
-                    metadataGridRow(label: "Recorded", value: location)
-                }
-                if let releaseDate = song.releaseDate, !releaseDate.isEmpty {
-                    Divider().padding(.leading, 24)
-                    metadataGridRow(label: "Released", value: releaseDate)
-                }
-
-                if hasSoundByte {
-                    Divider().padding(.leading, 24)
-                    metadataGridRow(label: "Clip Start", value: Self.formatTime(editingStartTime))
-                    Divider().padding(.leading, 24)
-                    metadataGridRow(label: "Clip End", value: Self.formatTime(editingEndTime))
-                    Divider().padding(.leading, 24)
-                    metadataGridRow(label: "Clip Length", value: Self.formatTime(editingEndTime - editingStartTime))
-                }
+            if let featured = song.featuredArtists, !featured.isEmpty {
+                cardRow(label: "Featured", value: featured.joined(separator: ", "))
             }
-            .padding(.bottom, 12)
+            if let producers = song.producerArtists, !producers.isEmpty {
+                cardRow(label: "Producers", value: producers.joined(separator: ", "))
+            }
+            if let writers = song.writerArtists, !writers.isEmpty {
+                cardRow(label: "Writers", value: writers.joined(separator: ", "))
+            }
+            if let language = song.language, !language.isEmpty {
+                cardRow(label: "Language", value: language)
+            }
+            if let location = song.recordingLocation, !location.isEmpty {
+                cardRow(label: "Recorded", value: location)
+            }
+            if let releaseDate = song.releaseDate, !releaseDate.isEmpty {
+                cardRow(label: "Released", value: releaseDate)
+            }
+
+            if hasSoundByte {
+                cardRow(label: "Clip Start", value: Self.formatTime(editingStartTime))
+                cardRow(label: "Clip End", value: Self.formatTime(editingEndTime))
+                cardRow(label: "Clip Length", value: Self.formatTime(editingEndTime - editingStartTime))
+            }
         }
     }
 
-    private func metadataGridRow(label: String, value: String) -> some View {
-        GridRow {
-            Text(label)
-                .foregroundStyle(.secondary)
-                .frame(width: 80, alignment: .leading)
-            Text(value)
-                .lineLimit(1)
-                .truncationMode(.middle)
-        }
-        .font(.callout)
-        .padding(.horizontal, 24)
-        .padding(.vertical, 6)
-    }
-
-    // MARK: - Song Facts Section
+    // MARK: - Song Facts Card
 
     private func hasSongFacts(_ song: Song) -> Bool {
         let desc = song.songDescription
@@ -385,16 +383,9 @@ struct BingoGameInfoView: View {
     }
 
     @ViewBuilder
-    private func songFactsSection(_ song: Song) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Song Facts")
-                .font(.subheadline)
-                .fontWeight(.semibold)
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 24)
-                .padding(.top, 12)
-
-            VStack(alignment: .leading, spacing: 10) {
+    private func songFactsCard(_ song: Song) -> some View {
+        sectionCard(header: "Song Facts") {
+            VStack(alignment: .leading, spacing: 0) {
                 if let desc = song.songDescription, !desc.isEmpty {
                     DisclosureGroup("About This Song") {
                         Text(desc)
@@ -403,7 +394,8 @@ struct BingoGameInfoView: View {
                             .padding(.top, 4)
                     }
                     .font(.caption.weight(.medium))
-                    .padding(.horizontal, 24)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
                 }
 
                 let annotations = song.annotations ?? []
@@ -411,6 +403,7 @@ struct BingoGameInfoView: View {
                 let accepted = annotations.filter { !$0.verified }
 
                 if !verified.isEmpty {
+                    Divider().padding(.leading, 16)
                     DisclosureGroup("Artist Annotations (\(verified.count))") {
                         VStack(alignment: .leading, spacing: 12) {
                             ForEach(Array(verified.enumerated()), id: \.offset) { _, fact in
@@ -420,10 +413,12 @@ struct BingoGameInfoView: View {
                         .padding(.top, 4)
                     }
                     .font(.caption.weight(.medium))
-                    .padding(.horizontal, 24)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
                 }
 
                 if !accepted.isEmpty {
+                    Divider().padding(.leading, 16)
                     DisclosureGroup("Top Annotations (\(accepted.count))") {
                         VStack(alignment: .leading, spacing: 12) {
                             ForEach(Array(accepted.enumerated()), id: \.offset) { _, fact in
@@ -433,11 +428,10 @@ struct BingoGameInfoView: View {
                         .padding(.top, 4)
                     }
                     .font(.caption.weight(.medium))
-                    .padding(.horizontal, 24)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
                 }
-
             }
-            .padding(.bottom, 12)
         }
     }
 
@@ -472,7 +466,7 @@ struct BingoGameInfoView: View {
         }
     }
 
-    // MARK: - Credits Section
+    // MARK: - Credits Card
 
     private func hasCredits(_ song: Song) -> Bool {
         guard let credits = song.credits else { return false }
@@ -480,15 +474,8 @@ struct BingoGameInfoView: View {
     }
 
     @ViewBuilder
-    private func creditsSection(_ song: Song) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Credits")
-                .font(.subheadline)
-                .fontWeight(.semibold)
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 24)
-                .padding(.top, 12)
-
+    private func creditsCard(_ song: Song) -> some View {
+        sectionCard(header: "Credits") {
             DisclosureGroup("Performance Credits (\(song.credits?.count ?? 0))") {
                 VStack(alignment: .leading, spacing: 6) {
                     ForEach(Array((song.credits ?? []).enumerated()), id: \.offset) { _, credit in
@@ -506,12 +493,12 @@ struct BingoGameInfoView: View {
                 .padding(.top, 4)
             }
             .font(.caption.weight(.medium))
-            .padding(.horizontal, 24)
-            .padding(.bottom, 12)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
         }
     }
 
-    // MARK: - Song Relationships Section
+    // MARK: - Connections Card
 
     private func hasRelationships(_ song: Song) -> Bool {
         guard let relationships = song.songRelationships else { return false }
@@ -519,16 +506,9 @@ struct BingoGameInfoView: View {
     }
 
     @ViewBuilder
-    private func relationshipsSection(_ song: Song) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Song Relationships")
-                .font(.subheadline)
-                .fontWeight(.semibold)
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 24)
-                .padding(.top, 12)
-
-            DisclosureGroup("Connections (\(song.songRelationships?.count ?? 0))") {
+    private func connectionsCard(_ song: Song) -> some View {
+        sectionCard(header: "Connections") {
+            DisclosureGroup("Song Relationships (\(song.songRelationships?.count ?? 0))") {
                 VStack(alignment: .leading, spacing: 6) {
                     ForEach(Array((song.songRelationships ?? []).enumerated()), id: \.offset) { _, rel in
                         HStack(alignment: .top, spacing: 6) {
@@ -545,8 +525,8 @@ struct BingoGameInfoView: View {
                 .padding(.top, 4)
             }
             .font(.caption.weight(.medium))
-            .padding(.horizontal, 24)
-            .padding(.bottom, 12)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
         }
     }
 
@@ -566,7 +546,7 @@ struct BingoGameInfoView: View {
         }
     }
 
-    // MARK: - Media Links Section
+    // MARK: - Links Card
 
     private func hasMediaLinks(_ song: Song) -> Bool {
         let hasLinks = song.mediaLinks != nil && !song.mediaLinks!.isEmpty
@@ -575,15 +555,8 @@ struct BingoGameInfoView: View {
     }
 
     @ViewBuilder
-    private func mediaLinksSection(_ song: Song) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Links")
-                .font(.subheadline)
-                .fontWeight(.semibold)
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 24)
-                .padding(.top, 12)
-
+    private func linksCard(_ song: Song) -> some View {
+        sectionCard(header: "Links") {
             VStack(alignment: .leading, spacing: 8) {
                 if let links = song.mediaLinks, !links.isEmpty {
                     WrappingHStack(spacing: 8) {
@@ -612,8 +585,7 @@ struct BingoGameInfoView: View {
                     }
                 }
             }
-            .padding(.horizontal, 24)
-            .padding(.bottom, 12)
+            .padding(16)
         }
     }
 

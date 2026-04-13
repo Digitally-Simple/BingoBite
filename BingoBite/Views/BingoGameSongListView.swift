@@ -7,7 +7,7 @@ struct BingoGameSongListView: View {
 
     var body: some View {
         List {
-            ForEach(Array(shuffledSongs.enumerated()), id: \.offset) { index, urlString in
+            ForEach(Array(shuffledSongs.enumerated()), id: \.element) { index, urlString in
                 let song = songLookup[urlString]
                 songRow(index: index, song: song, urlString: urlString)
                     .moveDisabled(index <= currentIndex)

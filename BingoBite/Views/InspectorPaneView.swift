@@ -68,6 +68,7 @@ struct InspectorPaneView: View {
                 }
             }
             .padding(.vertical)
+            .disclosureGroupStyle(TappableDisclosureGroupStyle())
         }
     }
 
@@ -707,6 +708,37 @@ struct InspectorPaneView: View {
         let minutes = Int(time) / 60
         let seconds = Int(time) % 60
         return String(format: "%d:%02d", minutes, seconds)
+    }
+}
+
+// MARK: - Tappable disclosure group style
+
+/// Makes the entire DisclosureGroup header row (chevron + label) tappable,
+/// not just the chevron.
+struct TappableDisclosureGroupStyle: DisclosureGroupStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        VStack(alignment: .leading) {
+            HStack {
+                Image(systemName: "chevron.right")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+                    .rotationEffect(.degrees(configuration.isExpanded ? 90 : 0))
+                    .animation(.easeInOut(duration: 0.2), value: configuration.isExpanded)
+                configuration.label
+                Spacer()
+            }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                withAnimation {
+                    configuration.isExpanded.toggle()
+                }
+            }
+
+            if configuration.isExpanded {
+                configuration.content
+                    .padding(.leading, 13)
+            }
+        }
     }
 }
 

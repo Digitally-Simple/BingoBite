@@ -61,6 +61,7 @@ struct SongMetadataEditorSheet: View {
                     VStack(alignment: .leading, spacing: 16) {
                         songFactsSection
                     }
+                    .disclosureGroupStyle(TappableDisclosureGroupStyle())
                     .padding(.horizontal, 20)
                     .padding(.bottom, 20)
                 }

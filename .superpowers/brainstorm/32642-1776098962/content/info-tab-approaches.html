@@ -1,0 +1,185 @@
+<h2>Info Tab Redesign — Pick a Direction</h2>
+<p class="subtitle">The current tab is a flat vertical stack of divider-separated sections. Which aesthetic direction feels right?</p>
+
+<div class="cards">
+
+  <!-- Approach A -->
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image" style="background: #1a1a2e; padding: 24px; min-height: 320px;">
+      <!-- Album Page mockup -->
+      <div style="position: relative; border-radius: 12px; overflow: hidden; background: linear-gradient(160deg, #2d1b4e 0%, #1a1a2e 50%, #0f2027 100%); padding: 28px;">
+        <!-- Blurred background effect hint -->
+        <div style="display: flex; gap: 20px; align-items: flex-start;">
+          <div style="width: 120px; height: 120px; border-radius: 10px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+            <span style="font-size: 40px; opacity: 0.7;">♪</span>
+          </div>
+          <div style="flex: 1; min-width: 0;">
+            <div style="font-size: 20px; font-weight: 700; color: #fff; margin-bottom: 4px;">Song Title</div>
+            <div style="font-size: 14px; color: rgba(255,255,255,0.7); margin-bottom: 2px;">Artist Name</div>
+            <div style="font-size: 12px; color: rgba(255,255,255,0.5);">Album Name</div>
+            <!-- Mini playback -->
+            <div style="margin-top: 12px;">
+              <div style="height: 3px; background: rgba(255,255,255,0.15); border-radius: 2px; position: relative;">
+                <div style="position: absolute; height: 100%; width: 35%; background: rgba(255,255,255,0.6); border-radius: 2px;"></div>
+              </div>
+              <div style="display: flex; justify-content: center; gap: 16px; margin-top: 8px;">
+                <span style="color: rgba(255,255,255,0.5); font-size: 14px;">⏮</span>
+                <span style="color: #fff; font-size: 18px;">▶</span>
+                <span style="color: rgba(255,255,255,0.5); font-size: 14px;">⏭</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cards below -->
+      <div style="margin-top: 14px; display: flex; flex-direction: column; gap: 10px;">
+        <div style="background: rgba(255,255,255,0.06); border-radius: 10px; padding: 14px;">
+          <div style="font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: rgba(255,255,255,0.4); margin-bottom: 8px;">Sound Byte</div>
+          <div style="display: flex; gap: 16px;">
+            <div><span style="color: rgba(255,255,255,0.5); font-size: 11px;">Start</span> <span style="color: #fff; font-size: 13px; font-family: monospace;">1:23</span></div>
+            <div><span style="color: rgba(255,255,255,0.5); font-size: 11px;">End</span> <span style="color: #fff; font-size: 13px; font-family: monospace;">2:45</span></div>
+          </div>
+        </div>
+        <div style="background: rgba(255,255,255,0.06); border-radius: 10px; padding: 14px;">
+          <div style="font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: rgba(255,255,255,0.4); margin-bottom: 8px;">Details</div>
+          <div style="display: grid; grid-template-columns: 70px 1fr; gap: 4px 8px; font-size: 12px;">
+            <span style="color: rgba(255,255,255,0.45);">Duration</span><span style="color: #fff;">3:42</span>
+            <span style="color: rgba(255,255,255,0.45);">Size</span><span style="color: #fff;">8.2 MB</span>
+            <span style="color: rgba(255,255,255,0.45);">Released</span><span style="color: #fff;">2024</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A: Album Page</h3>
+      <p>Apple Music-inspired. Gradient hero with artwork + playback controls overlaid. Below: grouped cards with subtle backgrounds for each section. Dark, immersive, music-forward.</p>
+    </div>
+  </div>
+
+  <!-- Approach B -->
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image" style="background: #f5f5f7; padding: 24px; min-height: 320px;">
+      <!-- Grouped Settings mockup -->
+      <div style="max-width: 100%;">
+        <!-- Hero -->
+        <div style="display: flex; gap: 16px; align-items: center; margin-bottom: 16px;">
+          <div style="width: 80px; height: 80px; border-radius: 10px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+            <span style="font-size: 28px; opacity: 0.7;">♪</span>
+          </div>
+          <div>
+            <div style="font-size: 18px; font-weight: 700; color: #1d1d1f;">Song Title</div>
+            <div style="font-size: 13px; color: #86868b;">Artist Name · Album Name</div>
+            <div style="font-size: 11px; color: #86868b; margin-top: 2px;">3:42 · 8.2 MB</div>
+          </div>
+        </div>
+
+        <!-- Playback card -->
+        <div style="background: #fff; border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.06);">
+          <div style="height: 3px; background: #e5e5ea; border-radius: 2px; position: relative; margin-bottom: 8px;">
+            <div style="position: absolute; height: 100%; width: 35%; background: #007aff; border-radius: 2px;"></div>
+            <div style="position: absolute; left: 20%; width: 30%; height: 100%; background: rgba(52,199,89,0.2); border-radius: 2px;"></div>
+          </div>
+          <div style="display: flex; justify-content: center; gap: 20px; font-size: 14px; color: #333;">
+            <span>⏮</span> <span style="font-size: 18px;">▶</span> <span>⏭</span>
+          </div>
+        </div>
+
+        <!-- Grouped sections -->
+        <div style="background: #fff; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.06); margin-bottom: 10px;">
+          <div style="padding: 10px 14px; display: flex; justify-content: space-between; border-bottom: 1px solid #f0f0f0;">
+            <span style="font-size: 12px; color: #86868b;">Title</span>
+            <span style="font-size: 12px; color: #1d1d1f;">Song Title</span>
+          </div>
+          <div style="padding: 10px 14px; display: flex; justify-content: space-between; border-bottom: 1px solid #f0f0f0;">
+            <span style="font-size: 12px; color: #86868b;">Artist</span>
+            <span style="font-size: 12px; color: #1d1d1f;">Artist Name</span>
+          </div>
+          <div style="padding: 10px 14px; display: flex; justify-content: space-between;">
+            <span style="font-size: 12px; color: #86868b;">Album</span>
+            <span style="font-size: 12px; color: #1d1d1f;">Album Name</span>
+          </div>
+        </div>
+
+        <div style="background: #fff; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.06);">
+          <div style="padding: 10px 14px; display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 12px; color: #1d1d1f;">About This Song</span>
+            <span style="font-size: 10px; color: #86868b;">›</span>
+          </div>
+          <div style="padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #f0f0f0;">
+            <span style="font-size: 12px; color: #1d1d1f;">Credits (5)</span>
+            <span style="font-size: 10px; color: #86868b;">›</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B: Grouped Cards</h3>
+      <p>iOS Settings-style grouped sections. White cards on light gray. Compact hero, clean metadata rows inside rounded groups. Familiar, scannable, native macOS feel.</p>
+    </div>
+  </div>
+
+  <!-- Approach C -->
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image" style="background: #fafafa; padding: 24px; min-height: 320px;">
+      <!-- Hybrid mockup -->
+      <div style="max-width: 100%;">
+        <!-- Large artwork with overlay info -->
+        <div style="position: relative; border-radius: 12px; overflow: hidden; margin-bottom: 16px;">
+          <div style="width: 100%; aspect-ratio: 2.5 / 1; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: flex-end; padding: 16px;">
+            <div style="flex: 1;">
+              <div style="font-size: 22px; font-weight: 800; color: #fff; letter-spacing: -0.5px;">Song Title</div>
+              <div style="font-size: 13px; color: rgba(255,255,255,0.75); margin-top: 2px;">Artist Name — Album Name</div>
+            </div>
+            <div style="display: flex; gap: 12px; align-items: center; color: #fff;">
+              <span style="font-size: 12px;">⏮</span>
+              <div style="width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; font-size: 14px;">▶</div>
+              <span style="font-size: 12px;">⏭</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Two-column layout -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+          <div style="background: #fff; border-radius: 10px; padding: 14px; border: 1px solid #e8e8e8;">
+            <div style="font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #999; margin-bottom: 8px;">Sound Byte</div>
+            <div style="display: flex; gap: 16px; font-size: 12px;">
+              <div><span style="color: #999;">Start</span> <span style="font-family: monospace; color: #34c759;">1:23</span></div>
+              <div><span style="color: #999;">End</span> <span style="font-family: monospace; color: #ff3b30;">2:45</span></div>
+            </div>
+          </div>
+          <div style="background: #fff; border-radius: 10px; padding: 14px; border: 1px solid #e8e8e8;">
+            <div style="font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #999; margin-bottom: 8px;">File Info</div>
+            <div style="font-size: 12px; color: #333;">3:42 · 8.2 MB</div>
+            <div style="font-size: 11px; color: #999; margin-top: 2px;">song-file.mp3</div>
+          </div>
+        </div>
+
+        <!-- Full width details -->
+        <div style="background: #fff; border-radius: 10px; padding: 14px; border: 1px solid #e8e8e8;">
+          <div style="display: grid; grid-template-columns: 70px 1fr 70px 1fr; gap: 6px 8px; font-size: 12px;">
+            <span style="color: #999;">Title</span><span style="color: #333;">Song Title</span>
+            <span style="color: #999;">Artist</span><span style="color: #333;">Artist Name</span>
+            <span style="color: #999;">Album</span><span style="color: #333;">Album Name</span>
+            <span style="color: #999;">Year</span><span style="color: #333;">2024</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C: Cinematic Hero + Grid</h3>
+      <p>Wide banner hero with artwork as background gradient, title overlaid. Below: two-column card grid for quick-glance data, then full-width detail card. Modern, spacious, visual-first.</p>
+    </div>
+  </div>
+
+</div>
+
+<div class="section" style="margin-top: 24px; padding: 16px; background: rgba(255,255,255,0.05); border-radius: 8px;">
+  <h3>What stays the same in all approaches</h3>
+  <ul style="font-size: 14px; color: #aaa; line-height: 1.8;">
+    <li>All the same data: hero, playback, sound byte, metadata, facts, credits, relationships, links</li>
+    <li>Playback controls integrated (not a separate section feel)</li>
+    <li>Disclosure groups for expandable content (facts, credits, etc.)</li>
+    <li>macOS native SwiftUI — no web views, just SwiftUI components</li>
+  </ul>
+</div>
