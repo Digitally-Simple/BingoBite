@@ -16,12 +16,12 @@ struct CardWithOverlaysView: View {
         .overlay {
             GeometryReader { geo in
                 ForEach(settings.imageOverlays) { overlay in
-                    if let nsImage = overlay.cachedImage {
-                        let imageAspect = nsImage.size.width / max(nsImage.size.height, 1)
+                    if let overlayImage = overlay.cachedImage {
+                        let imageAspect = overlayImage.size.width / max(overlayImage.size.height, 1)
                         let imageWidth = geo.size.width * overlay.normalizedScale
                         let imageHeight = imageWidth / max(imageAspect, 0.01)
 
-                        Image(nsImage: nsImage)
+                        Image(platformImage: overlayImage)
                             .resizable()
                             .aspectRatio(contentMode: .fit)
                             .frame(width: imageWidth, height: imageHeight)

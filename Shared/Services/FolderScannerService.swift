@@ -2,7 +2,15 @@ import Foundation
 import AVFoundation
 
 enum FolderScannerService {
-    static let supportedExtensions: Set<String> = ["mp3", "m4a", "flac", "wav", "opus"]
+    /// Opus needs ffmpeg to read and AVAudioPlayer can't play it, so it is
+    /// macOS-only.
+    static let supportedExtensions: Set<String> = {
+        #if os(macOS)
+        ["mp3", "m4a", "flac", "wav", "opus"]
+        #else
+        ["mp3", "m4a", "flac", "wav"]
+        #endif
+    }()
 
     static func scanForAudio(in folderURL: URL) async throws -> [Song] {
         let fileManager = FileManager.default
@@ -23,10 +31,17 @@ enum FolderScannerService {
             let asset = AVURLAsset(url: fileURL)
             let duration = try await asset.load(.duration)
             let commonMetadata = try await asset.load(.commonMetadata)
-            let artwork = await artworkData(in: commonMetadata)
+            var artwork = await artworkData(in: commonMetadata)
 
-            // ffprobe: all text metadata as flat key-value pairs
+            // Text metadata as flat key-value pairs: ffmpeg on macOS, native
+            // container parsing on iOS (no process spawning there).
+            #if os(macOS)
             let tags = probeTags(for: fileURL)
+            #else
+            let parsed = AudioTagReader.read(url: fileURL)
+            let tags = parsed.tags
+            artwork = artwork ?? parsed.artwork
+            #endif
 
             let song = Song(
                 id: fileURL,
@@ -59,8 +74,9 @@ enum FolderScannerService {
         return songs.sorted { $0.displayTitle.localizedCaseInsensitiveCompare($1.displayTitle) == .orderedAscending }
     }
 
-    // MARK: - ffprobe metadata
+    // MARK: - ffprobe metadata (macOS only — iOS cannot spawn processes)
 
+    #if os(macOS)
     /// Run ffmpeg to extract all tags as a flat [String: String] dictionary.
     /// Uses `-f ffmetadata` output which gives `key=value` lines.
     /// Returns empty dict on failure (non-fatal — song still gets basic info).
@@ -132,6 +148,7 @@ enum FolderScannerService {
             .replacingOccurrences(of: "\\#", with: "#")
             .replacingOccurrences(of: "\\\\", with: "\\")
     }
+    #endif
 
     /// Decode a JSON-encoded string value into a typed Swift object.
     private static func decodeJSON<T: Decodable>(_ type: T.Type, from value: String?) -> T? {

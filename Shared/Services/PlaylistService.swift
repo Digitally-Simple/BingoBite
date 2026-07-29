@@ -102,7 +102,8 @@ enum PlaylistService {
     /// `BookmarkService.stopAccessing(_:)` when done.
     @MainActor
     static func loadSongs(
-        for playlist: Playlist
+        for playlist: Playlist,
+        in context: ModelContext? = nil
     ) async throws -> (songs: [Song], missingTracks: [MissingTrack], allScanned: [Song], accessedURL: URL) {
         guard !playlist.bookmarkData.isEmpty else {
             throw PlaylistServiceError.bookmarkAccessDenied
@@ -113,16 +114,39 @@ enum PlaylistService {
         }
         do {
             let scanned = try await FolderScannerService.scanForAudio(in: url)
-            let scannedLookup = Dictionary(uniqueKeysWithValues: scanned.map { ($0.id.absoluteString, $0) })
+            let index = SongIndex(scanned)
 
             var songs: [Song] = []
             var missingTracks: [MissingTrack] = []
+            var relinked: [(Int, String)] = []
 
-            for (index, urlString) in playlist.songURLStrings.enumerated() {
-                if let song = scannedLookup[urlString] {
-                    songs.append(song)
-                } else {
-                    missingTracks.append(MissingTrack(index: index, originalURLString: urlString))
+            for (position, urlString) in playlist.songURLStrings.enumerated() {
+                guard let song = index.song(for: urlString) else {
+                    missingTracks.append(MissingTrack(index: position, originalURLString: urlString))
+                    continue
+                }
+                songs.append(song)
+
+                // Matched by file name, so the stored path is stale — the folder
+                // moved, or iOS re-created the app's data container.
+                let current = song.id.absoluteString
+                if current != urlString {
+                    relinked.append((position, current))
+                }
+            }
+
+            // Heal the stored paths so the next load is an exact match. Card
+            // grids index into this array by position, which is preserved.
+            if let context {
+                let folderMoved = playlist.folderPath != url.path
+                for (position, urlString) in relinked {
+                    playlist.songURLStrings[position] = urlString
+                }
+                if folderMoved {
+                    playlist.folderPath = url.path
+                }
+                if folderMoved || !relinked.isEmpty {
+                    try? context.save()
                 }
             }
 

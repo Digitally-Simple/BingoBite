@@ -19,9 +19,6 @@ enum SidebarSelection: Hashable {
 struct SidebarView: View {
     @Environment(\.modelContext) private var modelContext
     @Binding var selection: SidebarSelection?
-    var trialDaysRemaining: Int?
-    var onShowSettings: (() -> Void)?
-
     @Query(sort: \Playlist.name) private var playlists: [Playlist]
     @Query(sort: \BingoGame.creationDate, order: .reverse) private var bingoGames: [BingoGame]
 
@@ -69,20 +66,5 @@ struct SidebarView: View {
         }
         .listStyle(.sidebar)
         .navigationTitle("BingoBite")
-        .safeAreaInset(edge: .bottom) {
-            if let days = trialDaysRemaining {
-                Button {
-                    onShowSettings?()
-                } label: {
-                    Label("Trial: \(days) \(days == 1 ? "day" : "days") remaining", systemImage: "clock")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                }
-                .buttonStyle(.plain)
-            }
-        }
     }
 }

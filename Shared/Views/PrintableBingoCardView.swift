@@ -9,10 +9,12 @@ struct PrintableBingoCardView: View {
     private let bingoColumns = ["B", "I", "N", "G", "O"]
     private let cardAspectRatio: CGFloat = 8.5 / 11.0
 
+    /// Tolerates stale stored paths (moved folder, re-created iOS container).
+    private var index: SongIndex { SongIndex(songs) }
+
     private func song(for gridValue: Int) -> Song? {
         guard gridValue > 0, gridValue <= songURLStrings.count else { return nil }
-        let urlString = songURLStrings[gridValue - 1]
-        return songs.first { $0.id.absoluteString == urlString }
+        return index.song(for: songURLStrings[gridValue - 1])
     }
 
     var body: some View {
@@ -109,7 +111,7 @@ struct PrintableBingoCardView: View {
 
         return VStack(spacing: 1) {
             if settings.showArtwork && !settings.useArtworkAsBackground, let image = matchedSong?.artworkImage {
-                Image(nsImage: image)
+                Image(platformImage: image)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
                     .frame(width: 28, height: 28)
@@ -146,7 +148,7 @@ struct PrintableBingoCardView: View {
         .aspectRatio(1, contentMode: .fit)
         .background {
             if settings.useArtworkAsBackground, let image = matchedSong?.artworkImage {
-                Image(nsImage: image)
+                Image(platformImage: image)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
                     .opacity(settings.artworkBackgroundOpacity)

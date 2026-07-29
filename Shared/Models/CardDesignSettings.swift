@@ -1,5 +1,4 @@
 import SwiftUI
-import AppKit
 
 struct CardDesignSettings: Codable, Equatable {
     // MARK: - Cell Content Toggles
@@ -92,10 +91,18 @@ extension Color {
     }
 
     func toHex() -> String {
+        #if os(macOS)
         guard let nsColor = NSColor(self).usingColorSpace(.deviceRGB) else { return "#000000" }
         let r = Int((nsColor.redComponent * 255).rounded())
         let g = Int((nsColor.greenComponent * 255).rounded())
         let b = Int((nsColor.blueComponent * 255).rounded())
+        #else
+        var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 0
+        UIColor(self).getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+        let r = Int((red * 255).rounded())
+        let g = Int((green * 255).rounded())
+        let b = Int((blue * 255).rounded())
+        #endif
         return String(format: "#%02X%02X%02X", r, g, b)
     }
 }

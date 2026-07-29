@@ -1,5 +1,5 @@
 import Foundation
-import AppKit
+import SwiftUI
 
 struct Song: Identifiable, Hashable {
     var id: URL
@@ -30,15 +30,15 @@ struct Song: Identifiable, Hashable {
     var songRelationships: [SongRelationshipEntry]?
     var geniusURL: URL?
 
-    private static let imageCache = NSCache<NSURL, NSImage>()
+    private static let imageCache = NSCache<NSURL, PlatformImage>()
 
-    var artworkImage: NSImage? {
+    var artworkImage: PlatformImage? {
         guard let data = artworkData else { return nil }
         let cacheKey = id as NSURL
         if let cached = Self.imageCache.object(forKey: cacheKey) {
             return cached
         }
-        guard let image = NSImage(data: data) else { return nil }
+        guard let image = PlatformImage(data: data) else { return nil }
         Self.imageCache.setObject(image, forKey: cacheKey)
         return image
     }

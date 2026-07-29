@@ -1,4 +1,4 @@
-import AppKit
+import SwiftUI
 import AVFoundation
 import Combine
 import MediaPlayer
@@ -34,7 +34,22 @@ final class AudioPlayerService: ObservableObject {
     }
 
     init() {
+        configureAudioSession()
         setupRemoteCommandCenter()
+    }
+
+    /// iOS needs an explicit playback session so audio keeps going with the
+    /// screen locked or the app backgrounded (the iPad is the game host).
+    private func configureAudioSession() {
+        #if os(iOS)
+        let session = AVAudioSession.sharedInstance()
+        do {
+            try session.setCategory(.playback, mode: .default)
+            try session.setActive(true)
+        } catch {
+            print("AudioPlayerService: audio session setup failed - \(error.localizedDescription)")
+        }
+        #endif
     }
 
     func play(_ song: Song) {
@@ -224,7 +239,7 @@ final class AudioPlayerService: ObservableObject {
         if let album = song.album {
             info[MPMediaItemPropertyAlbumTitle] = album
         }
-        if let artworkData = song.artworkData, let image = NSImage(data: artworkData) {
+        if let artworkData = song.artworkData, let image = PlatformImage(data: artworkData) {
             let artwork = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
             info[MPMediaItemPropertyArtwork] = artwork
         }

@@ -12,16 +12,11 @@ import Sparkle
 @main
 struct BingoBiteApp: App {
     let container: ModelContainer
-    @State private var isLicensed = false
-    @State private var isTrialing = false
-    @State private var trialDaysRemaining = 0
-    @State private var trialExpired = false
-    @State private var hasCheckedLicense = false
 
     private let updaterController: SPUStandardUpdaterController
 
     private static let schemaVersionKey = "BingoBite.SchemaVersion"
-    private static let currentSchemaVersion = 2
+    private static let currentSchemaVersion = 3
 
     init() {
         Self.resetStoreIfNeeded()
@@ -51,32 +46,7 @@ struct BingoBiteApp: App {
 
     var body: some Scene {
         WindowGroup {
-            Group {
-                if !hasCheckedLicense {
-                    ProgressView("Checking license...")
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if isLicensed || isTrialing {
-                    ContentView(trialDaysRemaining: isTrialing ? trialDaysRemaining : nil)
-                } else {
-                    LicenseGateView(
-                        trialExpired: trialExpired,
-                        onActivated: { isLicensed = true },
-                        onTrialStarted: {
-                            isTrialing = true
-                            trialDaysRemaining = TrialService.trialDurationDays
-                        }
-                    )
-                }
-            }
-            .task {
-                await checkLicense()
-            }
-            .onReceive(NotificationCenter.default.publisher(for: .licenseStateChanged)) { _ in
-                isLicensed = false
-                isTrialing = false
-                hasCheckedLicense = false
-                Task { await checkLicense() }
-            }
+            ContentView()
         }
         .modelContainer(container)
         .commands {
@@ -85,54 +55,5 @@ struct BingoBiteApp: App {
                 CheckForUpdatesView(updater: updaterController.updater)
             }
         }
-    }
-
-    @MainActor
-    private func checkLicense() async {
-        let context = container.mainContext
-        let descriptor = FetchDescriptor<AppSettings>()
-        guard let settings = try? context.fetch(descriptor).first else {
-            hasCheckedLicense = true
-            return
-        }
-
-        let key = settings.licenseKey
-        let instanceId = settings.licenseKeyInstanceId
-
-        // 1. Check license key if present
-        if !key.isEmpty, !instanceId.isEmpty {
-            do {
-                let valid = try await LicenseService.validate(licenseKey: key, instanceId: instanceId)
-                if valid {
-                    settings.lastLicenseValidationDate = Date()
-                    try? context.save()
-                    isLicensed = true
-                    hasCheckedLicense = true
-                    return
-                } else {
-                    LicenseService.clearLicense(settings: settings, in: context)
-                }
-            } catch {
-                if LicenseService.isWithinOfflineGracePeriod(lastValidation: settings.lastLicenseValidationDate) {
-                    isLicensed = true
-                    hasCheckedLicense = true
-                    return
-                }
-            }
-        }
-
-        // 2. No valid license — check trial status
-        let status = TrialService.trialStatus(settings: settings, in: context)
-        switch status {
-        case .notStarted:
-            break
-        case .active(let days):
-            isTrialing = true
-            trialDaysRemaining = days
-        case .expired:
-            trialExpired = true
-        }
-
-        hasCheckedLicense = true
     }
 }
