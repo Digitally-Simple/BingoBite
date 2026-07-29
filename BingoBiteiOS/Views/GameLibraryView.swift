@@ -93,13 +93,14 @@ struct GameLibraryView: View {
 
     private func row(_ game: BingoGame) -> some View {
         let total = max(game.shuffledSongURLStrings.count, 1)
-        let progress = Double(max(game.currentIndex + 1, 0)) / Double(total)
+        let round = max(game.currentIndex + 1, 0)
+        let status = Scoreboard.Status.resting(for: game)
 
         return HStack(spacing: 16) {
-            Image(systemName: game.isCompleted ? "flag.checkered" : "dot.radiowaves.left.and.right")
-                .font(.title3)
-                .foregroundStyle(game.isCompleted ? AnyShapeStyle(.secondary) : AnyShapeStyle(Color.green))
-                .frame(width: 32)
+            // The round replaces the old status glyph: the number is the thing
+            // you actually want off a list of half-finished games.
+            RoundChip(round: round, size: 19, tint: status.tint)
+                .frame(width: 46, alignment: .leading)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(game.name)
@@ -113,24 +114,31 @@ struct GameLibraryView: View {
 
             Spacer(minLength: 12)
 
+            StatusPill(status: status, compact: true)
+
             VStack(alignment: .trailing, spacing: 4) {
-                Text(game.progress)
-                    .font(.subheadline)
-                    .monospacedDigit()
-                ProgressView(value: progress)
-                    .frame(width: 110)
-                    .tint(game.isCompleted ? .secondary : .accentColor)
+                MeterLane(
+                    title: "ROUNDS CALLED",
+                    filled: round,
+                    total: total,
+                    tint: status.tint,
+                    isMuted: round == 0,
+                    height: 6,
+                    labelColor: .secondary,
+                    trackColor: .primary.opacity(0.12)
+                )
             }
+            .frame(width: 150)
 
             Menu {
                 Button("Open", systemImage: "arrow.up.forward") { onOpen(game.persistentModelID) }
                 Button("Delete", systemImage: "trash", role: .destructive) { pendingDeletion = game }
             } label: {
                 Image(systemName: "ellipsis")
-                    .foregroundStyle(.secondary)
                     .frame(width: 32, height: 32)
                     .contentShape(Rectangle())
             }
+            .tint(.secondary)
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 14)

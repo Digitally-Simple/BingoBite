@@ -23,6 +23,7 @@ struct GameView: View {
     @Environment(\.modelContext) private var modelContext
     var game: BingoGame
     @ObservedObject var audioPlayer: AudioPlayerService
+    var onInspectSong: (Song) -> Void
 
     @State private var activeTab: GameTab = .songs
     @State private var songs: [Song] = []
@@ -30,6 +31,9 @@ struct GameView: View {
     @State private var isLoading = true
     @State private var loadError: String?
     @State private var showEndConfirmation = false
+    /// Scoring every board is cheap but not free, so the count is recomputed
+    /// when the game moves rather than on every re-render.
+    @State private var bingoCount = 0
 
     private var songLookup: SongIndex { SongIndex(songs) }
 
@@ -64,21 +68,20 @@ struct GameView: View {
                     Text("The playlist this game came from may have been deleted, or its folder moved in Files.")
                 }
             } else {
-                tabContent
+                VStack(spacing: 0) {
+                    ScoreboardBanner(
+                        game: game,
+                        song: currentSong,
+                        isPlaying: audioPlayer.isPlaying,
+                        bingoCount: bingoCount
+                    )
+                    tabContent
+                }
             }
         }
         .navigationTitle(game.name)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .principal) {
-                Picker("View", selection: $activeTab) {
-                    ForEach(GameTab.allCases) { tab in
-                        Text(tab.rawValue).tag(tab)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .frame(width: 360)
-            }
             ToolbarItem(placement: .topBarTrailing) {
                 if !game.isCompleted {
                     Button("End Game", systemImage: "flag.checkered", role: .destructive) {
@@ -87,20 +90,31 @@ struct GameView: View {
                 }
             }
         }
-        .safeAreaInset(edge: .bottom) {
-            if !isLoading && loadError == nil {
-                transportDeck
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 12)
+        .modifier(
+            DeckOverlay(isVisible: !isLoading && loadError == nil) {
+                gameDeck
             }
-        }
+        )
         .task(id: game.playlistUUID) { await loadSongs() }
         .onAppear { updateSkipHandlers() }
         .onDisappear {
             audioPlayer.clearSkipHandlers()
+            BingoLiveActivityCommandBus.shared.setHandler(nil)
+            BingoLiveActivityController.stop()
             releaseAccess()
         }
-        .onChange(of: game.currentIndex) { updateSkipHandlers() }
+        .onChange(of: game.currentIndex) {
+            updateSkipHandlers()
+            syncLiveActivity()
+        }
+        .onChange(of: audioPlayer.isPlaying) { syncLiveActivity() }
+        .onChange(of: game.isCompleted) {
+            if game.isCompleted {
+                let state = liveActivityState
+                bingoCount = state.bingoCount
+                BingoLiveActivityController.finish(state: state)
+            }
+        }
         .confirmationDialog("End this game?", isPresented: $showEndConfirmation, titleVisibility: .visible) {
             Button("End Game", role: .destructive) { endGame() }
         } message: {
@@ -127,88 +141,28 @@ struct GameView: View {
 
     // MARK: - Transport deck
 
-    private var transportDeck: some View {
-        GlassEffectContainer(spacing: 16) {
-            HStack(spacing: 18) {
-                nowPlayingSummary
-
-                Spacer(minLength: 12)
-
-                if game.isCompleted {
-                    Label("Game Complete", systemImage: "flag.checkered")
-                        .font(.headline)
-                        .foregroundStyle(.secondary)
-                } else {
-                    controls
-                }
-            }
-            .padding(.horizontal, 18)
-            .padding(.vertical, 14)
-            .glassCard(corner: Glassware.panelCorner)
-        }
-        .frame(maxWidth: 900)
-    }
-
-    private var nowPlayingSummary: some View {
-        HStack(spacing: 14) {
-            ZStack {
-                ArtworkView(data: currentSong?.artworkData, corner: 12)
-                if currentSong == nil {
-                    Image(systemName: "questionmark")
-                        .font(.title2)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .frame(width: 58, height: 58)
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(roundLabel)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.tint)
-                    .monospacedDigit()
-
-                Text(currentSong?.displayTitle ?? "No song played yet")
-                    .font(.headline)
-                    .lineLimit(1)
-
-                Text(currentSong?.displayArtist ?? "Tap Next Song to reveal the first track")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
-        }
+    private var gameDeck: some View {
+        GameDeck(
+            roundLabel: roundLabel,
+            song: currentSong,
+            isCompleted: game.isCompleted,
+            canGoBack: canGoBack,
+            canGoForward: canGoForward,
+            isPlaying: audioPlayer.isPlaying,
+            canPlayPause: game.currentIndex >= 0,
+            progress: audioPlayer.progress,
+            activeTab: $activeTab,
+            onPrevious: previousSong,
+            onPlayPause: playPause,
+            onNext: nextSong,
+            onInspect: { if let currentSong { onInspectSong(currentSong) } }
+        )
     }
 
     private var roundLabel: String {
         if game.isCompleted { return "Completed" }
         if game.currentIndex < 0 { return "Ready" }
         return "Round \(game.currentIndex + 1) of \(game.shuffledSongURLStrings.count)"
-    }
-
-    private var controls: some View {
-        HStack(spacing: 10) {
-            Button("Previous", systemImage: "backward.fill") { previousSong() }
-                .labelStyle(.iconOnly)
-                .buttonStyle(.glass)
-                .buttonBorderShape(.circle)
-                .controlSize(.large)
-                .disabled(!canGoBack)
-
-            Button(
-                audioPlayer.isPlaying ? "Pause" : "Play",
-                systemImage: audioPlayer.isPlaying ? "pause.fill" : "play.fill"
-            ) { playPause() }
-                .labelStyle(.iconOnly)
-                .buttonStyle(.glass)
-                .buttonBorderShape(.circle)
-                .controlSize(.large)
-                .disabled(game.currentIndex < 0)
-
-            Button("Next Song", systemImage: "forward.fill") { nextSong() }
-                .buttonStyle(.glassProminent)
-                .controlSize(.large)
-                .disabled(!canGoForward)
-        }
     }
 
     // MARK: - Loading
@@ -243,6 +197,10 @@ struct GameView: View {
             songs = []
         }
         isLoading = false
+        if loadError == nil {
+            updateSkipHandlers()
+            syncLiveActivity()
+        }
     }
 
     private func applyOverrides() {
@@ -306,6 +264,7 @@ struct GameView: View {
     private func updateSkipHandlers() {
         guard !game.isCompleted else {
             audioPlayer.clearSkipHandlers()
+            BingoLiveActivityCommandBus.shared.setHandler(nil)
             return
         }
 
@@ -339,5 +298,49 @@ struct GameView: View {
         } : nil
 
         player.setSkipState(canForward: canGoForward, canBackward: canGoBack)
+
+        // The Lock Screen buttons ride the same handlers, so a press from the
+        // Live Activity moves the game exactly as the deck does — then pushes
+        // the new state straight back to the card, because SwiftUI's `onChange`
+        // can't be relied on while the app is backgrounded.
+        BingoLiveActivityCommandBus.shared.setHandler { command in
+            switch command {
+            case .nextRound:
+                player.skipForward()
+            case .previousRound:
+                player.skipBackward()
+            case .togglePlayback:
+                if player.currentSong != nil {
+                    player.togglePlayPause()
+                } else {
+                    player.skipForward()
+                }
+            }
+
+            let index = game.currentIndex
+            let song = (index >= 0 && index < game.shuffledSongURLStrings.count)
+                ? lookup.song(for: game.shuffledSongURLStrings[index])
+                : nil
+            BingoLiveActivityController.sync(
+                game: game,
+                state: BingoLiveActivityState.make(game: game, song: song, isPlaying: player.isPlaying)
+            )
+        }
+    }
+
+    // MARK: - Live Activity
+
+    private var liveActivityState: BingoGameActivityAttributes.ContentState {
+        BingoLiveActivityState.make(game: game, song: currentSong, isPlaying: audioPlayer.isPlaying)
+    }
+
+    /// One pass over the boards feeds both the on-screen scoreboard and the
+    /// Lock Screen card — they're showing the same numbers, so they should be
+    /// computed together.
+    private func syncLiveActivity() {
+        let state = liveActivityState
+        bingoCount = state.bingoCount
+        guard !isLoading, loadError == nil, !game.isCompleted else { return }
+        BingoLiveActivityController.sync(game: game, state: state)
     }
 }

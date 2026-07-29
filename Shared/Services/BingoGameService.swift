@@ -178,8 +178,11 @@ enum BingoGameService {
                 playedSongURLs: played,
                 hasFreeSpace: hasFreeSpace
             )
-            // Check if any line is a bingo
-            let hasBingo = scored.contains { row in row.allSatisfy({ $0 == .bingo }) }
+            // `scoreCard` marks every cell of a completed line, so a single
+            // `.bingo` cell anywhere means a line landed. Testing for a fully
+            // `.bingo` matrix row instead would only ever catch horizontal
+            // bingos and miss every column and diagonal.
+            let hasBingo = scored.contains { row in row.contains(.bingo) }
             if hasBingo { return round }
         }
         return nil

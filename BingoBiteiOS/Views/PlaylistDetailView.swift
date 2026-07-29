@@ -328,7 +328,7 @@ struct PlaylistDetailView: View {
                 Label(Format.time(clip.clipDuration), systemImage: "scissors")
                     .font(.caption2.weight(.medium))
                     .monospacedDigit()
-                    .foregroundStyle(.green)
+                    .foregroundStyle(.secondary)
             }
 
             Text(song.formattedDuration)
@@ -342,10 +342,12 @@ struct PlaylistDetailView: View {
             } label: {
                 Image(systemName: "ellipsis")
                     .font(.body)
-                    .foregroundStyle(.secondary)
                     .frame(width: 32, height: 32)
                     .contentShape(Rectangle())
             }
+            // A Menu tints its label like a button; the overflow affordance
+            // should stay quiet rather than claim the accent.
+            .tint(.secondary)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)

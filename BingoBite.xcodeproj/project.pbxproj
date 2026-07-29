@@ -8,11 +8,37 @@
 
 /* Begin PBXBuildFile section */
 		445243742F8AB8D6001512A8 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 445243732F8AB8D6001512A8 /* Sparkle */; };
+		44EE000D2FB00001001512A8 /* BingoBiteWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 44EE00012FB00001001512A8 /* BingoBiteWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		44EE000E2FB00001001512A8 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 44422FE32F38581400081179 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 44EE00042FB00001001512A8;
+			remoteInfo = BingoBiteWidgets;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		44EE000C2FB00001001512A8 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				44EE000D2FB00001001512A8 /* BingoBiteWidgets.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		44422FEB2F38581400081179 /* BingoBite.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BingoBite.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		44DD00042FA00001001512A8 /* BingoBite.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BingoBite.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		44EE00012FB00001001512A8 /* BingoBiteWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = BingoBiteWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -29,6 +55,13 @@
 				Info.plist,
 			);
 			target = 44DD00032FA00001001512A8 /* BingoBite for iPad */;
+		};
+		44EE000B2FB00001001512A8 /* Exceptions for "BingoBiteWidgets" folder in "BingoBiteWidgets" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 44EE00042FB00001001512A8 /* BingoBiteWidgets */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -54,6 +87,19 @@
 			path = BingoBiteiOS;
 			sourceTree = "<group>";
 		};
+		44EE00022FB00001001512A8 /* BingoLiveActivity */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = BingoLiveActivity;
+			sourceTree = "<group>";
+		};
+		44EE00032FB00001001512A8 /* BingoBiteWidgets */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				44EE000B2FB00001001512A8 /* Exceptions for "BingoBiteWidgets" folder in "BingoBiteWidgets" target */,
+			);
+			path = BingoBiteWidgets;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -72,6 +118,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		44EE00062FB00001001512A8 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -81,6 +134,8 @@
 				44DD00012FA00001001512A8 /* Shared */,
 				44422FED2F38581400081179 /* BingoBite */,
 				44DD00022FA00001001512A8 /* BingoBiteiOS */,
+				44EE00022FB00001001512A8 /* BingoLiveActivity */,
+				44EE00032FB00001001512A8 /* BingoBiteWidgets */,
 				445243792F8ABF4D001512A8 /* Frameworks */,
 				44422FEC2F38581400081179 /* Products */,
 			);
@@ -91,6 +146,7 @@
 			children = (
 				44422FEB2F38581400081179 /* BingoBite.app */,
 				44DD00042FA00001001512A8 /* BingoBite.app */,
+				44EE00012FB00001001512A8 /* BingoBiteWidgets.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -137,14 +193,17 @@
 				44DD00052FA00001001512A8 /* Sources */,
 				44DD00062FA00001001512A8 /* Frameworks */,
 				44DD00072FA00001001512A8 /* Resources */,
+				44EE000C2FB00001001512A8 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				44EE000F2FB00001001512A8 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				44DD00012FA00001001512A8 /* Shared */,
 				44DD00022FA00001001512A8 /* BingoBiteiOS */,
+				44EE00022FB00001001512A8 /* BingoLiveActivity */,
 			);
 			name = "BingoBite for iPad";
 			packageProductDependencies = (
@@ -152,6 +211,29 @@
 			productName = "BingoBite for iPad";
 			productReference = 44DD00042FA00001001512A8 /* BingoBite.app */;
 			productType = "com.apple.product-type.application";
+		};
+		44EE00042FB00001001512A8 /* BingoBiteWidgets */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 44EE00082FB00001001512A8 /* Build configuration list for PBXNativeTarget "BingoBiteWidgets" */;
+			buildPhases = (
+				44EE00052FB00001001512A8 /* Sources */,
+				44EE00062FB00001001512A8 /* Frameworks */,
+				44EE00072FB00001001512A8 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				44EE00022FB00001001512A8 /* BingoLiveActivity */,
+				44EE00032FB00001001512A8 /* BingoBiteWidgets */,
+			);
+			name = BingoBiteWidgets;
+			packageProductDependencies = (
+			);
+			productName = BingoBiteWidgets;
+			productReference = 44EE00012FB00001001512A8 /* BingoBiteWidgets.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -167,6 +249,9 @@
 						CreatedOnToolsVersion = 26.2;
 					};
 					44DD00032FA00001001512A8 = {
+						CreatedOnToolsVersion = 26.6;
+					};
+					44EE00042FB00001001512A8 = {
 						CreatedOnToolsVersion = 26.6;
 					};
 				};
@@ -190,6 +275,7 @@
 			targets = (
 				44422FEA2F38581400081179 /* BingoBite */,
 				44DD00032FA00001001512A8 /* BingoBite for iPad */,
+				44EE00042FB00001001512A8 /* BingoBiteWidgets */,
 			);
 		};
 /* End PBXProject section */
@@ -203,6 +289,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		44DD00072FA00001001512A8 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		44EE00072FB00001001512A8 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -248,7 +341,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		44EE00052FB00001001512A8 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		44EE000F2FB00001001512A8 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 44EE00042FB00001001512A8 /* BingoBiteWidgets */;
+			targetProxy = 44EE000E2FB00001001512A8 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		44422FF42F38581500081179 /* Debug */ = {
@@ -505,6 +613,70 @@
 			};
 			name = Release;
 		};
+		44EE00092FB00001001512A8 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 45T5N7MRFT;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = BingoBiteWidgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "BingoBite Live";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.digitallysimple.BingoBite.Widgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 2;
+			};
+			name = Debug;
+		};
+		44EE000A2FB00001001512A8 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 45T5N7MRFT;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = BingoBiteWidgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "BingoBite Live";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.digitallysimple.BingoBite.Widgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 2;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -531,6 +703,15 @@
 			buildConfigurations = (
 				44DD00092FA00001001512A8 /* Debug */,
 				44DD000A2FA00001001512A8 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		44EE00082FB00001001512A8 /* Build configuration list for PBXNativeTarget "BingoBiteWidgets" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				44EE00092FB00001001512A8 /* Debug */,
+				44EE000A2FB00001001512A8 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

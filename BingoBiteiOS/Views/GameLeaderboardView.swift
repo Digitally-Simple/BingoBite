@@ -81,49 +81,59 @@ struct GameLeaderboardView: View {
     private func row(_ stat: BingoGameService.CardStats) -> some View {
         let alreadyHit = stat.firstBingoRound.map { game.currentIndex >= 0 && $0 <= game.currentIndex + 1 } ?? false
 
+        // A card that has already hit wears gold; one that will hit later stays
+        // in the game's own colour so the two read as different kinds of news.
+        let tint: Color = alreadyHit ? BingoActivityTheme.gold : BingoActivityTheme.live
+
         return HStack(spacing: 16) {
             Text("#\(stat.id)")
                 .font(.headline)
                 .monospacedDigit()
                 .frame(width: 56, alignment: .leading)
 
-            VStack(alignment: .leading, spacing: 4) {
-                ProgressView(value: Double(stat.hitsCount), total: 24)
-                    .tint(stat.bingoCount > 0 ? .green : .accentColor)
-                Text("\(stat.hitsCount) of 24 squares")
-                    .font(.caption2)
-                    .monospacedDigit()
-                    .foregroundStyle(.secondary)
-            }
+            MeterLane(
+                title: "SQUARES MARKED",
+                filled: stat.hitsCount,
+                total: 24,
+                tint: tint,
+                isMuted: stat.hitsCount == 0,
+                height: 7,
+                labelColor: .secondary,
+                trackColor: .primary.opacity(0.12)
+            )
 
             Spacer(minLength: 8)
 
-            if stat.bingoCount > 0 {
-                Label("\(stat.bingoCount)", systemImage: "star.fill")
-                    .font(.subheadline.weight(.semibold))
-                    .monospacedDigit()
-                    .foregroundStyle(.orange)
-                    .frame(width: 56, alignment: .trailing)
-            } else {
-                Text("—")
-                    .foregroundStyle(.tertiary)
-                    .frame(width: 56, alignment: .trailing)
-            }
-
-            HStack(spacing: 5) {
-                if let round = stat.firstBingoRound {
-                    Text("Round \(round)")
-                        .monospacedDigit()
-                    if alreadyHit {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(.green)
-                    }
+            Group {
+                if stat.bingoCount > 0 {
+                    BingoBadge(
+                        bingoCount: stat.bingoCount,
+                        label: stat.bingoCount == 1 ? "1 LINE" : "\(stat.bingoCount) LINES"
+                    )
                 } else {
-                    Text("No bingo")
+                    Text("—")
                         .foregroundStyle(.tertiary)
                 }
             }
-            .font(.subheadline)
+            .frame(width: 84, alignment: .trailing)
+
+            HStack(spacing: 6) {
+                if let round = stat.firstBingoRound {
+                    if alreadyHit {
+                        Image(systemName: "star.fill")
+                            .font(.caption2)
+                            .foregroundStyle(BingoActivityTheme.gold)
+                    }
+                    RoundChip(
+                        round: round,
+                        size: 15,
+                        tint: alreadyHit ? BingoActivityTheme.gold : .primary
+                    )
+                    CapsLabel(alreadyHit ? "HIT" : "TO COME", color: .secondary)
+                } else {
+                    CapsLabel("NO BINGO", color: .secondary.opacity(0.6))
+                }
+            }
             .frame(width: 130, alignment: .trailing)
         }
         .padding(.horizontal, 20)

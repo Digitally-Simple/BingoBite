@@ -74,7 +74,7 @@ struct GameBoardsView: View {
                     }
                 }
                 .padding(.horizontal, 20)
-                .padding(.bottom, 110)
+                .padding(.bottom, 24)
             }
         }
         .scrollEdgeEffectStyle(.soft, for: .top)
@@ -106,6 +106,22 @@ struct GameCardView: View {
         return position + 1
     }
 
+    /// Squares marked, free space excluded — the same count the leaderboard
+    /// meters, shown here so a board reads at a glance in the grid.
+    private var hits: Int {
+        var count = 0
+        for row in 0..<5 {
+            for column in 0..<5 where card.grid[row][column] != 0 {
+                if scoredMatrix[row][column] != .unplayed { count += 1 }
+            }
+        }
+        return count
+    }
+
+    private var tint: Color {
+        hasBingo ? BingoActivityTheme.gold : .accentColor
+    }
+
     var body: some View {
         VStack(spacing: 8) {
             HStack(spacing: 5) {
@@ -115,7 +131,7 @@ struct GameCardView: View {
                 if hasBingo {
                     Image(systemName: "star.fill")
                         .font(.caption)
-                        .foregroundStyle(.yellow)
+                        .foregroundStyle(BingoActivityTheme.gold)
                 }
             }
 
@@ -136,9 +152,18 @@ struct GameCardView: View {
                     }
                 }
             }
+
+            SegmentedMeter(
+                filled: hits,
+                total: 24,
+                tint: tint,
+                height: 5,
+                trackColor: .primary.opacity(0.12)
+            )
+            .padding(.top, 1)
         }
         .padding(12)
-        .glassCard(corner: Glassware.tileCorner, tint: hasBingo ? .green : nil)
+        .glassCard(corner: Glassware.tileCorner, tint: hasBingo ? BingoActivityTheme.gold : nil)
     }
 
     private func cell(row: Int, column: Int) -> some View {
@@ -150,15 +175,23 @@ struct GameCardView: View {
             RoundedRectangle(cornerRadius: 7, style: .continuous)
                 .fill(color(for: state))
 
+            // A bingo cell is a marked cell wearing a ring. Distinguishing the
+            // two by outline rather than by a second hue keeps the board to one
+            // accent while still making a win unmistakable at a glance.
+            if state == .bingo {
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .strokeBorder(.primary, lineWidth: 1.5)
+            }
+
             if value == 0 {
                 Image(systemName: "star.fill")
                     .font(.caption)
-                    .foregroundStyle(state == .bingo ? .white : .yellow)
+                    .foregroundStyle(ink(for: state))
             } else {
                 Text("\(callNumber(for: value) ?? value)")
                     .font(.caption.weight(.semibold))
                     .monospacedDigit()
-                    .foregroundStyle(state == .unplayed ? AnyShapeStyle(.secondary) : AnyShapeStyle(.white))
+                    .foregroundStyle(ink(for: state))
             }
         }
         .aspectRatio(1, contentMode: .fit)
@@ -182,11 +215,23 @@ struct GameCardView: View {
         }
     }
 
+    /// Gold is bright enough that white numerals disappear on it, so a bingo
+    /// square inverts to dark ink.
+    private func ink(for state: BingoGameService.CellState) -> AnyShapeStyle {
+        switch state {
+        case .unplayed: AnyShapeStyle(.secondary)
+        case .played:   AnyShapeStyle(.white)
+        case .bingo:    AnyShapeStyle(BingoActivityTheme.card)
+        }
+    }
+
     private func color(for state: BingoGameService.CellState) -> Color {
         switch state {
-        case .unplayed: Color.gray.opacity(0.18)
-        case .played: Color.orange.opacity(0.85)
-        case .bingo: Color.green.opacity(0.9)
+        case .unplayed: Color.primary.opacity(0.08)
+        case .played: Color.accentColor.opacity(0.80)
+        // A completed line is the one thing worth gold on the board, matching
+        // the badge in the header and the meter on the Lock Screen.
+        case .bingo: BingoActivityTheme.gold
         }
     }
 }
@@ -216,15 +261,15 @@ struct CellDetailPopover: View {
 
     private var timing: (text: String, icon: String, color: Color) {
         guard let roundIndex else { return ("Not in the play order", "questionmark.circle.fill", .secondary) }
-        guard currentIndex >= 0 else { return ("Plays in round \(roundIndex + 1)", "clock.fill", .blue) }
+        guard currentIndex >= 0 else { return ("Plays in round \(roundIndex + 1)", "clock.fill", .secondary) }
 
         let delta = roundIndex - currentIndex
-        if delta == 0 { return ("Playing now", "speaker.wave.2.fill", .green) }
+        if delta == 0 { return ("Playing now", "speaker.wave.2.fill", .accentColor) }
         if delta < 0 {
             let ago = abs(delta)
             return (ago == 1 ? "Played last round" : "Played \(ago) rounds ago", "checkmark.circle.fill", .secondary)
         }
-        return (delta == 1 ? "Plays next round" : "Plays in \(delta) rounds", "clock.fill", .blue)
+        return (delta == 1 ? "Plays next round" : "Plays in \(delta) rounds", "clock.fill", .secondary)
     }
 
     var body: some View {

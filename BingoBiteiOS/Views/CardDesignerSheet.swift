@@ -44,6 +44,7 @@ struct CardDesignerSheet: View {
                 )
                 .frame(maxWidth: .infinity)
             }
+            .appSurface()
             .navigationTitle("Design & Print Cards")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

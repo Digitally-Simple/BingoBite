@@ -8,7 +8,7 @@ struct SongDetailPanel: View {
     var song: Song?
     @ObservedObject var audioPlayer: AudioPlayerService
     var emptyMessage: String = "Select a song to see its details."
-    var bottomInset: CGFloat = 110
+    var bottomInset: CGFloat = 24
 
     @Environment(\.modelContext) private var modelContext
 
@@ -142,7 +142,7 @@ struct SongDetailPanel: View {
                     let start = clipStart / audioPlayer.duration
                     let end = clipEnd / audioPlayer.duration
                     Capsule()
-                        .fill(.green.opacity(0.25))
+                        .fill(.tint.opacity(0.30))
                         .frame(width: max(0, CGFloat(end - start) * geo.size.width), height: 6)
                         .offset(x: CGFloat(start) * geo.size.width)
                         .frame(maxHeight: .infinity, alignment: .center)
@@ -333,7 +333,7 @@ struct SongDetailPanel: View {
                         if fact.verified {
                             Label("Verified", systemImage: "checkmark.seal.fill")
                                 .font(.caption)
-                                .foregroundStyle(.blue)
+                                .foregroundStyle(.tint)
                         } else {
                             Text("\(fact.votes) votes")
                                 .font(.caption)
@@ -480,6 +480,7 @@ struct SongInspectorSheet: View {
     var body: some View {
         NavigationStack {
             SongDetailPanel(song: song, audioPlayer: audioPlayer, bottomInset: 24)
+                .appSurface()
                 .navigationTitle("Song Details")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {

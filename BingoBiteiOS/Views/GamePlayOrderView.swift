@@ -12,12 +12,9 @@ struct GamePlayOrderView: View {
         List {
             ForEach(Array(shuffledSongs.enumerated()), id: \.element) { index, urlString in
                 row(index: index, song: songLookup.song(for: urlString))
-                    .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
-                    .listRowBackground(
-                        index == currentIndex
-                            ? Color.accentColor.opacity(0.12)
-                            : Color.clear
-                    )
+                    .listRowInsets(EdgeInsets(top: 3, leading: 16, bottom: 3, trailing: 16))
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
                     .moveDisabled(index <= currentIndex || isCompleted)
             }
             .onMove { source, destination in
@@ -28,16 +25,16 @@ struct GamePlayOrderView: View {
         }
         .listStyle(.plain)
         .scrollEdgeEffectStyle(.soft, for: .top)
-        .safeAreaPadding(.bottom, 96)
     }
 
     private func row(index: Int, song: Song?) -> some View {
         HStack(spacing: 14) {
-            Text("\(index + 1)")
-                .font(.callout.weight(.bold))
-                .monospacedDigit()
-                .foregroundStyle(index == currentIndex ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
-                .frame(width: 34, alignment: .trailing)
+            RoundChip(
+                round: index + 1,
+                size: index == currentIndex ? 17 : 15,
+                tint: index == currentIndex ? BingoActivityTheme.live : .secondary
+            )
+            .frame(width: 44, alignment: .trailing)
 
             ArtworkView(data: song?.artworkData, corner: 8)
                 .frame(width: 44, height: 44)
@@ -56,7 +53,16 @@ struct GamePlayOrderView: View {
 
             status(for: index)
         }
-        .padding(.vertical, 4)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        // The live round gets an inset tinted plate rather than a full-bleed
+        // row fill, so it sits on the backdrop like the rest of the surfaces.
+        .background {
+            if index == currentIndex {
+                RoundedRectangle(cornerRadius: Glassware.tileCorner, style: .continuous)
+                    .fill(.tint.opacity(0.16))
+            }
+        }
         .opacity(index < currentIndex ? 0.5 : 1)
     }
 
@@ -64,7 +70,7 @@ struct GamePlayOrderView: View {
     private func status(for index: Int) -> some View {
         if index < currentIndex {
             Image(systemName: "checkmark.circle.fill")
-                .foregroundStyle(.green)
+                .foregroundStyle(.secondary)
         } else if index == currentIndex {
             Image(systemName: "speaker.wave.2.fill")
                 .foregroundStyle(.tint)

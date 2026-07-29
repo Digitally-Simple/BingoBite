@@ -33,6 +33,10 @@ struct BingoBiteApp: App {
     var body: some Scene {
         WindowGroup {
             RootView()
+                // The app is designed as flat black or flat white with a single
+                // accent; dark is the one it's tuned for and the one a host is
+                // holding in a dim room.
+                .preferredColorScheme(.dark)
         }
         .modelContainer(container)
     }

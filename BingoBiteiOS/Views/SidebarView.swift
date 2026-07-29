@@ -14,23 +14,79 @@ struct SidebarView: View {
 
     private var activeGames: [BingoGame] { games.filter { !$0.isCompleted } }
 
+    /// One row shape for every entry. Rows with and without a subtitle share a
+    /// minimum height and a single gutter, so the column reads as one column
+    /// rather than two sizes of row stacked together.
+    private func row(title: String, subtitle: String? = nil, systemImage: String) -> some View {
+        Label {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .lineLimit(1)
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.caption2)
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+        } icon: {
+            Image(systemName: systemImage)
+                .foregroundStyle(.tint)
+        }
+        // Vertical breathing room only — the horizontal gutter is left to the
+        // sidebar list style so rows line up with the section headers and the
+        // navigation title instead of sitting at their own inset.
+        .padding(.vertical, 5)
+        .frame(minHeight: 34)
+    }
+
+    /// Games get the scoreboard treatment instead of a plain "18 / 28": the
+    /// tick strip shows how far in the game is without needing to be read.
+    private func gameRow(_ game: BingoGame) -> some View {
+        let total = max(game.shuffledSongURLStrings.count, 1)
+        let round = max(game.currentIndex + 1, 0)
+        let status = Scoreboard.Status.resting(for: game)
+
+        return Label {
+            VStack(alignment: .leading, spacing: 5) {
+                Text(game.name)
+                    .lineLimit(1)
+
+                HStack(spacing: 7) {
+                    SegmentedMeter(
+                        filled: round,
+                        total: total,
+                        tint: status.tint,
+                        height: 4,
+                        trackColor: .primary.opacity(0.14)
+                    )
+                    Text("\(round)/\(total)")
+                        .font(.system(size: 10, weight: .bold))
+                        .monospacedDigit()
+                        .foregroundStyle(status.tint)
+                }
+            }
+        } icon: {
+            Image(systemName: status.symbol)
+                .foregroundStyle(status.tint)
+        }
+        .padding(.vertical, 5)
+        .frame(minHeight: 34)
+    }
+
     var body: some View {
         List(selection: $selection) {
             Section("Playlists") {
-                Label("All Playlists", systemImage: "square.grid.2x2.fill")
+                row(title: "All Playlists", systemImage: "square.grid.2x2.fill")
                     .tag(SidebarSelection.allPlaylists)
 
                 ForEach(playlists) { playlist in
-                    Label {
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(playlist.name).lineLimit(1)
-                            Text("\(playlist.songCount) songs")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                        }
-                    } icon: {
-                        Image(systemName: "music.note.list")
-                    }
+                    row(
+                        title: playlist.name,
+                        subtitle: "\(playlist.songCount) songs",
+                        systemImage: "music.note.list"
+                    )
                     .tag(SidebarSelection.playlist(playlist.persistentModelID))
                     .swipeActions(edge: .trailing) {
                         Button("Delete", systemImage: "trash", role: .destructive) {
@@ -41,22 +97,11 @@ struct SidebarView: View {
             }
 
             Section("Bingo Games") {
-                Label("All Games", systemImage: "gamecontroller.fill")
+                row(title: "All Games", systemImage: "gamecontroller.fill")
                     .tag(SidebarSelection.allGames)
 
                 ForEach(activeGames) { game in
-                    Label {
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(game.name).lineLimit(1)
-                            Text(game.progress)
-                                .font(.caption2)
-                                .monospacedDigit()
-                                .foregroundStyle(.secondary)
-                        }
-                    } icon: {
-                        Image(systemName: "dot.radiowaves.left.and.right")
-                            .foregroundStyle(.green)
-                    }
+                    gameRow(game)
                     .tag(SidebarSelection.game(game.persistentModelID))
                     .swipeActions(edge: .trailing) {
                         Button("Delete", systemImage: "trash", role: .destructive) {
@@ -66,7 +111,15 @@ struct SidebarView: View {
                 }
             }
         }
+        .listStyle(.sidebar)
+        .listSectionSpacing(22)
+        .scrollContentBackground(.hidden)
+        // Keeps the first section off the navigation title rather than butting
+        // straight up against it.
+        .contentMargins(.top, 10, for: .scrollContent)
+        .appSurface()
         .navigationTitle("BingoBite")
+        .navigationBarTitleDisplayMode(.large)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button("Settings", systemImage: "gearshape") {

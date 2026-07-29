@@ -1,27 +1,87 @@
 import SwiftUI
 
-/// Shared Liquid Glass building blocks so the app reads as one surface.
+/// The app's surface vocabulary.
+///
+/// Two tiers, split by what a surface actually sits on:
+///
+/// * **Floating chrome** — the player deck, which hovers over scrolling
+///   content. Real content passes behind it, so it uses `Glass.clear` and
+///   genuinely refracts, exactly like the Music player.
+/// * **Content cards** — panels sitting on the page itself. The page is flat
+///   black or flat white, so clear glass there would refract nothing and the
+///   card would vanish. These use a quiet neutral fill with a hairline edge:
+///   structure without chrome.
 enum Glassware {
-    static let cardCorner: CGFloat = 22
-    static let panelCorner: CGFloat = 28
-    static let tileCorner: CGFloat = 18
+    static let cardCorner: CGFloat = 20
+    static let panelCorner: CGFloat = 24
+    static let tileCorner: CGFloat = 16
+    static let deckCorner: CGFloat = 30
+
+    /// Floating material — transparent, never frosted.
+    static func floating(tint: Color? = nil) -> Glass {
+        tint.map { Glass.clear.tint($0.opacity(0.45)) } ?? Glass.clear
+    }
+}
+
+/// The flat field the whole app sits on: black in dark, white in light.
+struct AppBackground: View {
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        (colorScheme == .dark ? Color.black : Color.white)
+            .ignoresSafeArea()
+    }
+}
+
+/// The quiet card surface — a near-invisible lift off the page plus a hairline
+/// so edges stay readable at a glance.
+private struct CardSurface: ViewModifier {
+    @Environment(\.colorScheme) private var colorScheme
+    var corner: CGFloat
+    var tint: Color?
+
+    private var fill: Color {
+        if let tint { return tint.opacity(colorScheme == .dark ? 0.16 : 0.12) }
+        return colorScheme == .dark ? .white.opacity(0.055) : .black.opacity(0.035)
+    }
+
+    private var stroke: Color {
+        if let tint { return tint.opacity(colorScheme == .dark ? 0.40 : 0.35) }
+        return colorScheme == .dark ? .white.opacity(0.10) : .black.opacity(0.09)
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .background(RoundedRectangle(cornerRadius: corner, style: .continuous).fill(fill))
+            .overlay(
+                RoundedRectangle(cornerRadius: corner, style: .continuous)
+                    .strokeBorder(stroke, lineWidth: 0.5)
+            )
+    }
 }
 
 extension View {
-    /// A raised content card: glass over the window background.
+    /// A content card on the page.
     func glassCard(corner: CGFloat = Glassware.cardCorner, tint: Color? = nil) -> some View {
-        glassEffect(
-            tint.map { Glass.regular.tint($0.opacity(0.5)) } ?? Glass.regular,
-            in: .rect(cornerRadius: corner)
-        )
+        modifier(CardSurface(corner: corner, tint: tint))
     }
 
-    /// A glass card that responds to touch — use for anything tappable.
+    /// A content card that is tappable. Same surface — the press feedback comes
+    /// from the button style, not from the material.
     func interactiveGlassCard(corner: CGFloat = Glassware.cardCorner, tint: Color? = nil) -> some View {
-        glassEffect(
-            (tint.map { Glass.regular.tint($0.opacity(0.5)) } ?? Glass.regular).interactive(),
-            in: .rect(cornerRadius: corner)
-        )
+        modifier(CardSurface(corner: corner, tint: tint))
+    }
+
+    /// A bar that floats over scrolling content. The one place real Liquid
+    /// Glass earns its keep, because there is something behind it to bend.
+    func glassDeck(corner: CGFloat = Glassware.deckCorner, tint: Color? = nil) -> some View {
+        glassEffect(Glassware.floating(tint: tint), in: .rect(cornerRadius: corner))
+            .shadow(color: .black.opacity(0.34), radius: 24, y: 10)
+    }
+
+    /// Puts a modally-presented surface on the same flat field as the window.
+    func appSurface() -> some View {
+        background { AppBackground() }
     }
 
     /// Section heading used above grouped content.
