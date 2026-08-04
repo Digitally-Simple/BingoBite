@@ -237,10 +237,9 @@ final class AudioPlayerService: ObservableObject {
         clipEndTime = nil
         currentTime = 0
         duration = 0
-        // Nothing is coming out, so the fader shows where it's set and the
-        // signal meter drops rather than holding the last sample it saw.
-        levels.set(output: clampedMasterVolume)
-        levels.reset()
+        // Nothing is coming out, so the needles drop rather than holding the
+        // last sample they saw.
+        levels.silence()
         clearNowPlayingInfo()
     }
 
@@ -492,7 +491,7 @@ final class AudioPlayerService: ObservableObject {
         timer = nil
         stopFadeTimer()
         stopMeterTimer()
-        levels.reset()
+        levels.silence()
     }
 
     // MARK: - Fade envelope
@@ -577,7 +576,6 @@ final class AudioPlayerService: ObservableObject {
         let level = min(max(level, 0), 1)
         currentOutputGain = level
         player?.volume = Float(level)
-        levels.set(output: level)
     }
 
     /// The gain last written to the player, kept so the signal meter can scale
@@ -613,15 +611,14 @@ final class AudioPlayerService: ObservableObject {
             return
         }
         player.updateMeters()
-        // The loudest channel, so a track mixed hard to one side still reads.
-        let channels = max(player.numberOfChannels, 1)
-        let peak = (0..<channels)
-            .map { Double(player.averagePower(forChannel: $0)) }
-            .max() ?? Double(Self.silentDecibels)
-        levels.feed(decibels: peak, gain: currentOutputGain)
+        // A mono file has one channel and drives both bars from it, rather
+        // than showing a dead right-hand side.
+        let leftDB = Double(player.averagePower(forChannel: 0))
+        let rightDB = player.numberOfChannels > 1
+            ? Double(player.averagePower(forChannel: 1))
+            : leftDB
+        levels.feed(leftDecibels: leftDB, rightDecibels: rightDB, gain: currentOutputGain)
     }
-
-    private static let silentDecibels: Float = -160
 
     private func startFadeTimer() {
         guard fadeEnvelope.isActive else {

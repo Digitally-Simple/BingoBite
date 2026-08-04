@@ -718,12 +718,15 @@ private struct GameDeckExpandedContent: View {
             details
         } trailing: {
             if !isCompleted, song != nil {
-                VerticalLevelFader(
-                    volume: $audioPlayer.masterVolume,
-                    levels: audioPlayer.levels,
-                    onCommit: onVolumeCommit
-                )
-                .frame(height: 190)
+                // Meter first, then the fader: the signal arrives *under* the
+                // ceiling, and reading left-to-right puts them in that order.
+                HStack(alignment: .bottom, spacing: 12) {
+                    ChannelMeters(levels: audioPlayer.levels)
+                    VerticalLevelFader(
+                        volume: $audioPlayer.masterVolume,
+                        onCommit: onVolumeCommit
+                    )
+                }
             }
         }
     }

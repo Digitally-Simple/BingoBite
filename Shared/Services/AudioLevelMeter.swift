@@ -1,45 +1,55 @@
 import Foundation
 import Combine
 
-/// The fast-moving numbers, kept off the player's own publisher.
+/// The live signal level, per channel, kept off the player's own publisher.
 ///
 /// `AudioPlayerService` publishes things a whole screen reacts to — the song,
-/// the round, the playhead. Volume moves far faster than any of that: a fade
-/// ticks at 60Hz and the signal meter at 24. Hanging those off the same
-/// publisher would redraw the game screen, boards and all, two dozen times a
-/// second for a bar a few points wide. They live here instead, and only the
-/// meter view observes it.
+/// the round, the playhead. Level moves far faster than any of that: this ticks
+/// twenty-four times a second. Hanging it off the same publisher would redraw
+/// the game screen, boards and all, at that rate for two bars a few points
+/// wide. It lives here instead, and only the meter observes it.
 @MainActor
 final class AudioLevelMeter: ObservableObject {
 
-    /// The gain the player is outputting: the fader scaled by wherever the
-    /// envelope is. Where the *fader* sits, not how loud the music is.
-    @Published private(set) var output: Double = 1
+    /// How loud each channel is right now, 0...1, after the gain going out — so
+    /// these fall away through a fade even though the music hasn't changed.
+    /// A mono file feeds the same value to both.
+    @Published private(set) var left: Double = 0
+    @Published private(set) var right: Double = 0
 
-    /// How loud the music itself is right now, 0...1, after that gain. This is
-    /// the one that bumps — it follows the track, so it moves with the beat and
-    /// goes quiet in the quiet parts.
-    @Published private(set) var signal: Double = 0
-
-    func set(output: Double) {
-        let clamped = min(max(output, 0), 1)
-        guard abs(clamped - self.output) > 0.001 else { return }
-        self.output = clamped
-    }
-
-    func set(signal: Double) {
-        let clamped = min(max(signal, 0), 1)
-        guard abs(clamped - self.signal) > 0.002 else { return }
-        self.signal = clamped
-    }
-
-    /// Nothing is playing: drop the needle rather than leaving it stuck at
+    /// Nothing is playing: drop the needles rather than leaving them stuck at
     /// whatever the last sample happened to be.
     func silence() {
-        signal = 0
+        smoothedLeft = 0
+        smoothedRight = 0
+        if left != 0 { left = 0 }
+        if right != 0 { right = 0 }
+    }
+
+    func feed(leftDecibels: Double, rightDecibels: Double, gain: Double) {
+        let gain = min(max(gain, 0), 1)
+        smoothedLeft = Self.ballistics(
+            current: smoothedLeft,
+            target: Self.normalize(decibels: leftDecibels) * gain
+        )
+        smoothedRight = Self.ballistics(
+            current: smoothedRight,
+            target: Self.normalize(decibels: rightDecibels) * gain
+        )
+        publish(&left, smoothedLeft)
+        publish(&right, smoothedRight)
+    }
+
+    private func publish(_ stored: inout Double, _ value: Double) {
+        // Below this the bar moves less than a pixel, so a redraw buys nothing.
+        guard abs(value - stored) > 0.002 else { return }
+        stored = min(max(value, 0), 1)
     }
 
     // MARK: - Ballistics
+
+    private var smoothedLeft: Double = 0
+    private var smoothedRight: Double = 0
 
     /// Where the meter bottoms out.
     ///
@@ -47,7 +57,7 @@ final class AudioLevelMeter: ObservableObject {
     /// a loud mix lives between roughly -20 and -6 dBFS and almost never visits
     /// the bottom half of a -60 dB scale, so a deep floor spends most of the bar
     /// on silence and the meter looks welded in place. -40 puts the range the
-    /// music actually uses across the whole column.
+    /// music actually uses across the whole bar.
     private static let floorDB: Double = -40
 
     /// Decibels to a 0...1 bar height.
@@ -61,21 +71,9 @@ final class AudioLevelMeter: ObservableObject {
 
     /// Rises instantly and falls away — the same asymmetry a hardware meter
     /// has. Without it the bar strobes on every kick drum instead of dancing.
-    private var smoothed: Double = 0
     private static let release: Double = 0.4
 
-    func feed(decibels: Double, gain: Double) {
-        let target = Self.normalize(decibels: decibels) * min(max(gain, 0), 1)
-        if target > smoothed {
-            smoothed = target
-        } else {
-            smoothed += (target - smoothed) * Self.release
-        }
-        set(signal: smoothed)
-    }
-
-    func reset() {
-        smoothed = 0
-        silence()
+    private static func ballistics(current: Double, target: Double) -> Double {
+        target > current ? target : current + (target - current) * release
     }
 }

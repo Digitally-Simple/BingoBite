@@ -155,19 +155,61 @@ private struct SegmentTimeline: View {
 
 // MARK: - Fader
 
-/// The master level, as a Control Center–style column that is also the meter.
+/// Height shared by the fader and the meter beside it, so the two read as one
+/// instrument rather than two controls that happen to be adjacent.
+enum DeckLevelMetrics {
+    static let columnHeight: CGFloat = 190
+}
+
+/// The live signal, as a pair of channel meters.
 ///
-/// Two fills, and the difference between them is the whole point. The soft one
-/// is the fader — where the host set the ceiling, and the only thing dragging
-/// moves. The bright one is the signal: how loud the music actually is right
-/// now, metered off the player and scaled by the gain going out, so it bumps
-/// with the track and sinks away through a fade while the fader stays put.
+/// Its own bars rather than a fill inside the fader: a meter drawn inside the
+/// control that sets the ceiling makes both harder to read — the level looks
+/// like it's lagging the thing you're dragging, when really it's the music.
+/// Separated, the fader is a static maximum you set and the meter is the sound
+/// arriving under it.
 ///
 /// Observes `AudioLevelMeter` rather than the player, so twenty-four updates a
-/// second redraw this column and nothing else on the screen.
+/// second redraw these two bars and nothing else on the screen.
+struct ChannelMeters: View {
+    @ObservedObject var levels: AudioLevelMeter
+
+    var body: some View {
+        HStack(spacing: 5) {
+            bar(level: levels.left)
+            bar(level: levels.right)
+        }
+        .frame(height: DeckLevelMetrics.columnHeight)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Output level")
+        .accessibilityValue(
+            "Left \(Int((levels.left * 100).rounded())) percent, right \(Int((levels.right * 100).rounded())) percent"
+        )
+    }
+
+    private func bar(level: Double) -> some View {
+        GeometryReader { geo in
+            ZStack(alignment: .bottom) {
+                Capsule().fill(.quaternary.opacity(0.55))
+
+                Capsule()
+                    .fill(.tint)
+                    .frame(height: geo.size.height * min(max(level, 0), 1))
+                    // Matches the feed rate: any slower and the bar smears
+                    // through the beat it's supposed to be showing.
+                    .animation(.linear(duration: 1.0 / 24.0), value: level)
+            }
+        }
+        .frame(width: 8)
+    }
+}
+
+/// The master level, as a Control Center–style column.
+///
+/// A static ceiling: it shows where the host set the maximum and moves only
+/// when dragged. What's actually coming out is the meter beside it.
 struct VerticalLevelFader: View {
     @Binding var volume: Double
-    @ObservedObject var levels: AudioLevelMeter
     /// Called when the drag ends, so the level can be saved without writing to
     /// the store on every frame.
     var onCommit: () -> Void
@@ -211,18 +253,9 @@ struct VerticalLevelFader: View {
             ZStack(alignment: .bottom) {
                 shape.fill(.quaternary.opacity(0.55))
 
-                // The fader: the ceiling, and what the drag moves.
-                Rectangle()
-                    .fill(.tint.opacity(0.32))
-                    .frame(height: height * volume)
-
-                // The signal: what's actually coming out, bumping with the
-                // track. Never taller than the fill above it, because it's
-                // already been scaled by the gain.
                 Rectangle()
                     .fill(.tint)
-                    .frame(height: height * levels.signal)
-                    .animation(.linear(duration: 1.0 / 24.0), value: levels.signal)
+                    .frame(height: height * min(max(volume, 0), 1))
 
                 Image(systemName: symbol)
                     .font(.system(size: 15, weight: .semibold))
@@ -256,6 +289,6 @@ struct VerticalLevelFader: View {
             .scaleEffect(x: isDragging ? 1.08 : 1, y: 1)
             .animation(.smooth(duration: 0.2), value: isDragging)
         }
-        .frame(width: 56)
+        .frame(width: 56, height: DeckLevelMetrics.columnHeight)
     }
 }
