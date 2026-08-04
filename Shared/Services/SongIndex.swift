@@ -1,41 +1,78 @@
 import Foundation
 
-/// Resolves the song URL strings frozen into a playlist or game back to the
-/// songs actually found on disk.
+/// Resolves the song keys frozen into a playlist or game back to the songs
+/// actually found on disk.
 ///
-/// Playlists store absolute file URLs, but those go stale whenever the source
-/// folder moves — and on iOS the app's data container is re-created on
-/// reinstall or restore, which rewrites the path of every file the app owns.
-/// The file name inside the playlist's folder is the stable identity, so fall
-/// back to it before declaring a track missing.
+/// Four rungs, most durable first:
+///
+/// 1. **`SONG_UID`** — survives renames, moves, and re-copies. Only files from
+///    Music Downloader carry one.
+/// 2. **Relative path** — survives the app's data container being re-created on
+///    reinstall or restore, which rewrites every absolute path.
+/// 3. **Absolute URL** — legacy keys written before this scheme existed.
+/// 4. **File name** — last resort, and the only rung that survives a folder
+///    being reorganized.
 struct SongIndex {
+    private let byUID: [String: Song]
+    private let byRelativePath: [String: Song]
     private let byURL: [String: Song]
     private let byFileName: [String: Song]
 
     init(_ songs: [Song]) {
-        byURL = Dictionary(songs.map { ($0.id.absoluteString, $0) }, uniquingKeysWith: { first, _ in first })
-        byFileName = Dictionary(songs.map { ($0.id.lastPathComponent, $0) }, uniquingKeysWith: { first, _ in first })
-    }
+        var uid: [String: Song] = [:]
+        var relative: [String: Song] = [:]
+        var url: [String: Song] = [:]
+        var name: [String: Song] = [:]
 
-    /// The song for a stored URL string, or nil when the file is really gone.
-    func song(for urlString: String) -> Song? {
-        if let exact = byURL[urlString] { return exact }
-        guard let fileName = Self.fileName(from: urlString) else { return nil }
-        return byFileName[fileName]
-    }
-
-    /// True when the stored string resolved only by file name, meaning the
-    /// caller should refresh the persisted URL.
-    func needsRelink(_ urlString: String) -> Bool {
-        byURL[urlString] == nil && song(for: urlString) != nil
-    }
-
-    static func fileName(from urlString: String) -> String? {
-        if let url = URL(string: urlString) {
-            let name = url.lastPathComponent
-            if !name.isEmpty { return name }
+        for song in songs {
+            if let songUID = song.uid, !songUID.isEmpty, uid[songUID] == nil {
+                uid[songUID] = song
+            }
+            if let path = song.relativePath, !path.isEmpty, relative[path] == nil {
+                relative[path] = song
+            }
+            let absolute = song.id.absoluteString
+            if url[absolute] == nil { url[absolute] = song }
+            let fileName = song.id.lastPathComponent
+            if name[fileName] == nil { name[fileName] = song }
         }
-        // Not a valid URL string — fall back to the trailing path segment.
-        return urlString.split(separator: "/").last.map(String.init)
+
+        byUID = uid
+        byRelativePath = relative
+        byURL = url
+        byFileName = name
+    }
+
+    /// The song for a stored key, or nil when the file is really gone.
+    func song(for key: String) -> Song? {
+        // Rung 1 — the embedded UID.
+        if let uid = SongKey.uid(from: key), let hit = byUID[uid] { return hit }
+
+        // Rung 2 — the relative path.
+        if let path = SongKey.path(from: key), let hit = byRelativePath[path] { return hit }
+
+        // Rung 3 — a legacy absolute URL string.
+        if SongKey.isLegacyURLString(key), let hit = byURL[key] { return hit }
+
+        // Rung 4 — the bare file name.
+        if let fileName = SongKey.fileName(from: key), let hit = byFileName[fileName] { return hit }
+
+        return nil
+    }
+
+    /// True when the key resolved on a weaker rung than it was written on,
+    /// meaning the caller should refresh the stored key.
+    func needsRelink(_ key: String) -> Bool {
+        guard let song = song(for: key) else { return false }
+        return song.stableKey != key
+    }
+
+    /// The key this song should be stored under now.
+    func currentKey(for key: String) -> String? {
+        song(for: key)?.stableKey
+    }
+
+    static func fileName(from key: String) -> String? {
+        SongKey.fileName(from: key)
     }
 }

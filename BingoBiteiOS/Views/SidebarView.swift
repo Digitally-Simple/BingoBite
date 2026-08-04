@@ -8,11 +8,20 @@ struct SidebarView: View {
 
     @Query(sort: \Playlist.name) private var playlists: [Playlist]
     @Query(sort: \BingoGame.creationDate, order: .reverse) private var games: [BingoGame]
+    @Query private var libraryEntries: [LibraryIndexEntry]
 
     @State private var playlistPendingDeletion: Playlist?
     @State private var gamePendingDeletion: BingoGame?
 
     private var activeGames: [BingoGame] { games.filter { !$0.isCompleted } }
+
+    private var missingSongCount: Int { libraryEntries.count(where: \.isMissing) }
+
+    private var songsSubtitle: String {
+        let total = libraryEntries.count
+        guard total > 0 else { return "No songs yet" }
+        return "\(total) song\(total == 1 ? "" : "s")"
+    }
 
     /// One row shape for every entry. Rows with and without a subtitle share a
     /// minimum height and a single gutter, so the column reads as one column
@@ -44,7 +53,7 @@ struct SidebarView: View {
     /// Games get the scoreboard treatment instead of a plain "18 / 28": the
     /// tick strip shows how far in the game is without needing to be read.
     private func gameRow(_ game: BingoGame) -> some View {
-        let total = max(game.shuffledSongURLStrings.count, 1)
+        let total = max(game.shuffledSongKeys.count, 1)
         let round = max(game.currentIndex + 1, 0)
         let status = Scoreboard.Status.resting(for: game)
 
@@ -77,6 +86,19 @@ struct SidebarView: View {
 
     var body: some View {
         List(selection: $selection) {
+            Section("Library") {
+                row(
+                    title: "Songs",
+                    subtitle: songsSubtitle,
+                    systemImage: "music.note"
+                )
+                // `.tag` must stay outermost — a modifier applied after it
+                // wraps the row and the List stops seeing the tag, which makes
+                // the row render but never select.
+                .badge(missingSongCount)
+                .tag(SidebarSelection.songs)
+            }
+
             Section("Playlists") {
                 row(title: "All Playlists", systemImage: "square.grid.2x2.fill")
                     .tag(SidebarSelection.allPlaylists)

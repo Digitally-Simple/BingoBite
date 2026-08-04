@@ -2,14 +2,16 @@ import SwiftUI
 import SwiftData
 
 enum SidebarSelection: Hashable {
+    case songs
     case allPlaylists
     case playlist(PersistentIdentifier)
     case allGames
     case game(PersistentIdentifier)
 
-    enum Kind { case playlist, game }
+    enum Kind { case songs, playlist, game }
     var kind: Kind {
         switch self {
+        case .songs: .songs
         case .allPlaylists, .playlist: .playlist
         case .allGames, .game: .game
         }
@@ -53,17 +55,18 @@ struct RootView: View {
         }
         .navigationSplitViewStyle(.balanced)
         .tint(.accentColor)
-        .sheet(isPresented: $showSettings) {
+        .sheet(isPresented: $showSettings, onDismiss: syncFadeEnvelope) {
             SettingsSheet()
         }
         .sheet(item: $inspectorSong) { song in
             SongInspectorSheet(song: song, audioPlayer: audioPlayer)
         }
+        .task { syncFadeEnvelope() }
         .onChange(of: selection) { oldValue, newValue in
             selectedSong = nil
             if oldValue?.kind != newValue?.kind {
                 audioPlayer.stop()
-                audioPlayer.clearSkipHandlers()
+                audioPlayer.clearPlaybackHandlers()
             }
         }
     }
@@ -71,6 +74,11 @@ struct RootView: View {
     @ViewBuilder
     private var detail: some View {
         switch selection {
+        case .songs:
+            SongsLibraryView()
+                .environmentObject(audioPlayer)
+                .withNowPlayingDeck(audioPlayer: audioPlayer, onTapSong: presentInspector)
+
         case .allPlaylists, .none:
             PlaylistLibraryView(onOpen: { selection = .playlist($0) })
                 .withNowPlayingDeck(audioPlayer: audioPlayer, onTapSong: presentInspector)
@@ -105,6 +113,13 @@ struct RootView: View {
     private func presentInspector(_ song: Song) {
         selectedSong = song
         inspectorSong = song
+    }
+
+    /// Pushes the saved fade settings into the player. Called on launch and
+    /// whenever Settings closes, so a changed curve takes effect on the next
+    /// song rather than the next launch.
+    private func syncFadeEnvelope() {
+        audioPlayer.fadeEnvelope = AppSettingsService.fadeEnvelope(in: modelContext)
     }
 }
 

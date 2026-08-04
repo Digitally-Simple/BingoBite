@@ -35,9 +35,41 @@ struct PlaylistCreateSheet: View {
     @State private var hasFreeSpace = true
 
     @State private var createError: String?
+    @State private var songSearch = ""
+    @State private var cardCountText = "10"
+    @FocusState private var cardCountFocused: Bool
+
+    /// True when songs came from the master library rather than a folder scan.
+    /// Library songs are read from the cached index, so no disk scan happens.
+    @State private var usingLibrary = false
+    @State private var librarySongCount = 0
 
     private var requiredSongs: Int { hasFreeSpace ? 24 : 25 }
     private var includedSongs: [Song] { scannedSongs.filter { !excluded.contains($0.id.absoluteString) } }
+
+    private var isSearching: Bool {
+        !songSearch.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// The songs the list is currently showing. Include/exclude actions operate
+    /// on this rather than on everything scanned.
+    private var visibleSongs: [Song] {
+        let query = songSearch.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return scannedSongs }
+        return scannedSongs.filter {
+            $0.displayTitle.localizedCaseInsensitiveContains(query)
+                || $0.displayArtist.localizedCaseInsensitiveContains(query)
+                || ($0.album?.localizedCaseInsensitiveContains(query) ?? false)
+        }
+    }
+
+    private func include(_ songs: [Song]) {
+        for song in songs { excluded.remove(song.id.absoluteString) }
+    }
+
+    private func exclude(_ songs: [Song]) {
+        for song in songs { excluded.insert(song.id.absoluteString) }
+    }
 
     private var canCreate: Bool {
         pickedFolder != nil
@@ -53,8 +85,11 @@ struct PlaylistCreateSheet: View {
                 folderSection
                 if pickedFolder != nil {
                     detailsSection
-                    songsSection
+                    // Cards before the song list: the list runs to hundreds of
+                    // rows, and burying the card settings under it means
+                    // scrolling the whole library to change a number.
                     cardsSection
+                    songsSection
                 }
                 if let createError {
                     Section {
@@ -78,6 +113,12 @@ struct PlaylistCreateSheet: View {
                         .buttonStyle(.glassProminent)
                         .disabled(!canCreate)
                 }
+                // The number pad has no return key, so the card count needs an
+                // explicit way out.
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") { cardCountFocused = false }
+                }
             }
             .fileImporter(
                 isPresented: $showFolderPicker,
@@ -88,6 +129,8 @@ struct PlaylistCreateSheet: View {
             }
             .onAppear {
                 suggestions = SongsFolderService.suggestedFolders()
+                librarySongCount = LibraryIndexService.allEntries(in: modelContext)
+                    .count { !$0.isMissing }
             }
         }
         .presentationDetents([.large])
@@ -99,15 +142,42 @@ struct PlaylistCreateSheet: View {
     private var folderSection: some View {
         Section {
             if let pickedFolder {
-                LabeledContent("Folder") {
-                    Text(SongsFolderService.displayPath(for: pickedFolder))
+                LabeledContent(usingLibrary ? "Source" : "Folder") {
+                    Text(usingLibrary
+                         ? "Your library — \(scannedSongs.count) songs"
+                         : SongsFolderService.displayPath(for: pickedFolder))
                         .lineLimit(2)
                         .multilineTextAlignment(.trailing)
                 }
                 Button("Choose a Different Folder", systemImage: "folder") {
+                    usingLibrary = false
                     showFolderPicker = true
                 }
             } else {
+                // The library first: it's the space-saving option, and for
+                // anyone using Music Downloader it's where everything already is.
+                if librarySongCount > 0 {
+                    Button {
+                        selectLibrary()
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "books.vertical.fill")
+                                .foregroundStyle(.tint)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Use My Library")
+                                    .foregroundStyle(.primary)
+                                Text("\(librarySongCount) songs · no extra copies on disk")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                }
+
                 if !suggestions.isEmpty || SongsFolderService.documentsRootHasAudio() {
                     if SongsFolderService.documentsRootHasAudio() {
                         folderButton(SongsFolderService.documentsURL, subtitle: "Loose files in the BingoBite folder")
@@ -184,8 +254,31 @@ struct PlaylistCreateSheet: View {
                 Text("No supported audio files in this folder.")
                     .foregroundStyle(.secondary)
             } else {
-                ForEach(scannedSongs) { song in
-                    songRow(song)
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundStyle(.secondary)
+                    TextField("Search these songs", text: $songSearch)
+                        .textFieldStyle(.plain)
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
+                    if !songSearch.isEmpty {
+                        Button {
+                            songSearch = ""
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundStyle(.tertiary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
+                if visibleSongs.isEmpty {
+                    Text("No songs match “\(songSearch)”.")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(visibleSongs) { song in
+                        songRow(song)
+                    }
                 }
             }
         } header: {
@@ -196,10 +289,13 @@ struct PlaylistCreateSheet: View {
                     Text("\(includedSongs.count) of \(scannedSongs.count) included")
                         .font(.caption)
                         .textCase(nil)
-                    Button("All") { excluded.removeAll() }
+                    // While a search is active these act on what's visible —
+                    // "None" silently clearing hidden songs would be a nasty
+                    // surprise after filtering to three of two hundred.
+                    Button(isSearching ? "All Shown" : "All") { include(visibleSongs) }
                         .font(.caption)
                         .textCase(nil)
-                    Button("None") { excluded = Set(scannedSongs.map(\.id.absoluteString)) }
+                    Button(isSearching ? "None Shown" : "None") { exclude(visibleSongs) }
                         .font(.caption)
                         .textCase(nil)
                 }
@@ -247,9 +343,50 @@ struct PlaylistCreateSheet: View {
 
     private var cardsSection: some View {
         Section("Bingo Cards") {
-            Stepper("Number of cards: \(numberOfCards)", value: $numberOfCards, in: 1...200)
+            LabeledContent("Number of cards") {
+                HStack(spacing: 10) {
+                    // Typing beats 90 taps on a stepper when a venue wants 100
+                    // cards, but the stepper stays for small adjustments.
+                    //
+                    // Backed by a String rather than `value:format:` because
+                    // `.keyboardType` is only a hint to the software keyboard —
+                    // an iPad in a keyboard case can type letters straight in.
+                    // The digits are filtered here instead.
+                    TextField("10", text: $cardCountText)
+                        .keyboardType(.numberPad)
+                        .multilineTextAlignment(.trailing)
+                        .frame(width: 72)
+                        .textFieldStyle(.roundedBorder)
+                        .focused($cardCountFocused)
+
+                    Stepper("Number of cards", value: $numberOfCards, in: Self.cardRange)
+                        .labelsHidden()
+                }
+            }
             Toggle("Free space in the center", isOn: $hasFreeSpace)
         }
+        .onAppear { cardCountText = String(numberOfCards) }
+        .onChange(of: cardCountText) { _, newValue in
+            let digits = String(newValue.filter(\.isNumber).prefix(3))
+            if digits != newValue { cardCountText = digits }
+            if let value = Int(digits) { numberOfCards = value }
+        }
+        .onChange(of: numberOfCards) { _, newValue in
+            // Keep the field in step when the stepper drives the change.
+            if Int(cardCountText) != newValue { cardCountText = String(newValue) }
+        }
+        .onChange(of: cardCountFocused) { _, isFocused in
+            // The number pad has no return key, so clamp when focus leaves
+            // rather than fighting the user mid-edit.
+            if !isFocused { clampCardCount() }
+        }
+    }
+
+    private static let cardRange = 1...500
+
+    private func clampCardCount() {
+        numberOfCards = min(max(numberOfCards, Self.cardRange.lowerBound), Self.cardRange.upperBound)
+        cardCountText = String(numberOfCards)
     }
 
     // MARK: - Actions
@@ -259,8 +396,24 @@ struct PlaylistCreateSheet: View {
         select(folder: url, isSecurityScoped: true)
     }
 
+    /// Loads songs straight from the library index — no folder scan, no tag
+    /// reads, so it's instant no matter how large the library is.
+    private func selectLibrary() {
+        releaseAccess()
+        usingLibrary = true
+        pickedFolder = SongsFolderService.libraryURL
+        scanError = nil
+        excluded = []
+        // Missing files can't be played, so they'd only produce dead cards.
+        scannedSongs = LibraryIndexService.allEntries(in: modelContext)
+            .filter { !$0.isMissing }
+            .map { $0.makeSong(libraryRoot: SongsFolderService.libraryURL) }
+        if !nameEditedByUser { name = "" }
+    }
+
     private func select(folder: URL, isSecurityScoped: Bool) {
         releaseAccess()
+        usingLibrary = false
 
         // Folders inside the app's own container are readable without a
         // security scope; picker results are not.

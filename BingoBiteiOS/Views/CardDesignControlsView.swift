@@ -4,6 +4,7 @@ import PhotosUI
 struct CardDesignControlsView: View {
     @Binding var settings: CardDesignSettings
     @Binding var selectedOverlayID: String?
+    @Binding var setID: String
 
     @State private var photoItem: PhotosPickerItem?
     @State private var showFileImporter = false
@@ -15,6 +16,7 @@ struct CardDesignControlsView: View {
             colors
             titleSection
             cardNumbers
+            setIdentity
             freeSpace
             pageLayout
             overlays
@@ -127,20 +129,78 @@ struct CardDesignControlsView: View {
         }
     }
 
+    /// Identifies a printed deck so cards from different decks can be sorted
+    /// back apart after they get shuffled together.
+    private var setIdentity: some View {
+        Section {
+            HStack {
+                Text("Set code")
+                Spacer()
+                TextField("AB", text: $setID)
+                    .multilineTextAlignment(.trailing)
+                    .textInputAutocapitalization(.characters)
+                    .autocorrectionDisabled()
+                    .frame(width: 90)
+                    .onChange(of: setID) { _, newValue in
+                        // Codes are read off paper and typed back in, so keep
+                        // them short and unambiguous.
+                        let cleaned = newValue.uppercased().filter { $0.isLetter || $0.isNumber }
+                        if cleaned != newValue { setID = String(cleaned.prefix(4)) }
+                        else if cleaned.count > 4 { setID = String(cleaned.prefix(4)) }
+                    }
+            }
+
+            Toggle("Print set code on cards", isOn: $settings.showSetID)
+                .disabled(!settings.showCardNumbers || setID.isEmpty)
+        } header: {
+            Text("Card Set")
+        } footer: {
+            Text(setIDSummary)
+        }
+    }
+
+    private var setIDSummary: String {
+        guard settings.showCardNumbers else {
+            return "Card numbers are off, so nothing is printed in the corner of each card."
+        }
+        guard settings.showSetID, !setID.isEmpty else {
+            return "Cards print as “Card #1”. Turn on the set code to print “\(setID.isEmpty ? "AB" : setID)-1” instead, so decks shuffled together can be sorted apart."
+        }
+        return "Cards print as “\(setID)-1”, “\(setID)-2”… Give each deck its own code so they can be told apart once mixed."
+    }
+
     private var pageLayout: some View {
-        Section("Page Layout") {
-            Picker("Cards per page", selection: $settings.cardsPerPage) {
+        Section {
+            Picker("Cards per sheet", selection: $settings.cardsPerPage) {
                 Text("1").tag(1)
                 Text("2").tag(2)
                 Text("4").tag(4)
             }
             .pickerStyle(.segmented)
 
-            Picker("Orientation", selection: $settings.pageOrientation) {
+            Picker("Paper orientation", selection: $settings.pageOrientation) {
                 Text("Portrait").tag("portrait")
                 Text("Landscape").tag("landscape")
             }
             .pickerStyle(.segmented)
+        } header: {
+            Text("Printing")
+        } footer: {
+            Text("How the cards sit on a sheet of US Letter paper when you print or export a PDF. \(printingSummary)")
+        }
+    }
+
+    /// Spells out the resulting arrangement, since "2 per sheet" means side by
+    /// side on landscape and stacked on portrait.
+    private var printingSummary: String {
+        let grid = settings.grid
+        let shape = settings.isLandscape ? "wider than they are tall" : "taller than they are wide"
+        switch settings.cardsPerPage {
+        case 1:  return "One card fills each sheet, \(shape)."
+        case 2:  return grid.columns == 2
+            ? "Two cards side by side, each \(shape)."
+            : "Two cards stacked, each \(shape)."
+        default: return "Four cards in a 2×2 grid, each \(shape)."
         }
     }
 

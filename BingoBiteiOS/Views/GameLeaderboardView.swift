@@ -21,13 +21,13 @@ struct GameLeaderboardView: View {
 
     private var stats: [BingoGameService.CardStats] {
         let played = BingoGameService.playedSongURLs(
-            shuffledSongs: game.shuffledSongURLStrings,
-            currentIndex: game.currentIndex
+            shuffledSongs: game.shuffledSongKeys,
+            currentIndex: max(game.currentIndex, game.highestPlayedIndex)
         )
         let raw = cards.map { card in
             let (hits, bingos) = BingoGameService.cardStats(
                 card: card,
-                songURLStrings: game.songURLStrings,
+                songKeys: game.songKeys,
                 playedSongURLs: played,
                 hasFreeSpace: game.hasFreeSpace
             )
@@ -37,8 +37,8 @@ struct GameLeaderboardView: View {
                 bingoCount: bingos,
                 firstBingoRound: BingoGameService.firstBingoRound(
                     card: card,
-                    songURLStrings: game.songURLStrings,
-                    shuffledSongs: game.shuffledSongURLStrings,
+                    songKeys: game.songKeys,
+                    shuffledSongs: game.shuffledSongKeys,
                     hasFreeSpace: game.hasFreeSpace
                 )
             )
@@ -79,7 +79,8 @@ struct GameLeaderboardView: View {
     }
 
     private func row(_ stat: BingoGameService.CardStats) -> some View {
-        let alreadyHit = stat.firstBingoRound.map { game.currentIndex >= 0 && $0 <= game.currentIndex + 1 } ?? false
+        let calledThroughRound = max(game.currentIndex, game.highestPlayedIndex) + 1
+        let alreadyHit = stat.firstBingoRound.map { calledThroughRound > 0 && $0 <= calledThroughRound } ?? false
 
         // A card that has already hit wears gold; one that will hit later stays
         // in the game's own colour so the two read as different kinds of news.

@@ -20,8 +20,8 @@ struct GameBoardsView: View {
 
     private var playedURLs: Set<String> {
         BingoGameService.playedSongURLs(
-            shuffledSongs: game.shuffledSongURLStrings,
-            currentIndex: game.currentIndex
+            shuffledSongs: game.shuffledSongKeys,
+            currentIndex: max(game.currentIndex, game.highestPlayedIndex)
         )
     }
 
@@ -29,7 +29,7 @@ struct GameBoardsView: View {
 
     var body: some View {
         Group {
-            if game.currentIndex < 0 {
+            if max(game.currentIndex, game.highestPlayedIndex) < 0 {
                 ContentUnavailableView {
                     Label("No Songs Played", systemImage: "square.grid.3x3")
                 } description: {
@@ -62,12 +62,12 @@ struct GameBoardsView: View {
                             card: card,
                             scoredMatrix: BingoGameService.scoreCard(
                                 card: card,
-                                songURLStrings: game.songURLStrings,
+                                songKeys: game.songKeys,
                                 playedSongURLs: playedURLs,
                                 hasFreeSpace: game.hasFreeSpace
                             ),
-                            songURLStrings: game.songURLStrings,
-                            shuffledSongs: game.shuffledSongURLStrings,
+                            songKeys: game.songKeys,
+                            shuffledSongs: game.shuffledSongKeys,
                             currentIndex: game.currentIndex,
                             songLookup: songLookup
                         )
@@ -86,7 +86,7 @@ struct GameBoardsView: View {
 struct GameCardView: View {
     var card: BingoCard
     var scoredMatrix: [[BingoGameService.CellState]]
-    var songURLStrings: [String]
+    var songKeys: [String]
     var shuffledSongs: [String]
     var currentIndex: Int
     var songLookup: SongIndex
@@ -101,8 +101,8 @@ struct GameCardView: View {
 
     /// Maps a card's 1-based song index to its position in the play order.
     private func callNumber(for songIndex: Int) -> Int? {
-        guard songIndex > 0, songIndex <= songURLStrings.count else { return nil }
-        guard let position = shuffledSongs.firstIndex(of: songURLStrings[songIndex - 1]) else { return nil }
+        guard songIndex > 0, songIndex <= songKeys.count else { return nil }
+        guard let position = shuffledSongs.firstIndex(of: songKeys[songIndex - 1]) else { return nil }
         return position + 1
     }
 
@@ -206,7 +206,7 @@ struct GameCardView: View {
         )) {
             CellDetailPopover(
                 songIndex: value,
-                songURLStrings: songURLStrings,
+                songKeys: songKeys,
                 shuffledSongs: shuffledSongs,
                 currentIndex: currentIndex,
                 songLookup: songLookup
@@ -240,14 +240,14 @@ struct GameCardView: View {
 
 struct CellDetailPopover: View {
     var songIndex: Int
-    var songURLStrings: [String]
+    var songKeys: [String]
     var shuffledSongs: [String]
     var currentIndex: Int
     var songLookup: SongIndex
 
     private var songURL: String? {
-        guard songIndex > 0, songIndex <= songURLStrings.count else { return nil }
-        return songURLStrings[songIndex - 1]
+        guard songIndex > 0, songIndex <= songKeys.count else { return nil }
+        return songKeys[songIndex - 1]
     }
 
     private var song: Song? {

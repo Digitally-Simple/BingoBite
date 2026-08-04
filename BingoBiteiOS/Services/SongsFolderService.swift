@@ -13,6 +13,37 @@ enum SongsFolderService {
         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
     }
 
+    /// The master library: one folder holding one copy of every song.
+    ///
+    /// Fixed inside the app's own Documents directory, which means the app owns
+    /// it — no security-scoped bookmarks, no stale-bookmark failures, and it
+    /// shows up in Files as **On My iPad › BingoBite › Library** for dragging
+    /// an export folder straight in.
+    static let libraryFolderName = "Library"
+
+    static var libraryURL: URL {
+        documentsURL.appendingPathComponent(libraryFolderName, isDirectory: true)
+    }
+
+    /// Folders in Documents that look like a Music Downloader export — they
+    /// carry a manifest at the top level. Offered as one-tap imports.
+    static func pendingExportFolders() -> [URL] {
+        let fm = FileManager.default
+        guard let entries = try? fm.contentsOfDirectory(
+            at: documentsURL,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        ) else { return [] }
+
+        return entries
+            .filter { $0.lastPathComponent != libraryFolderName }
+            .filter { (try? $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true }
+            .filter { fm.fileExists(atPath: $0.appendingPathComponent(manifestFileName).path) }
+            .sorted { $0.lastPathComponent < $1.lastPathComponent }
+    }
+
+    static let manifestFileName = "bingobite-library.json"
+
     /// Folders inside Documents that contain at least one supported audio file.
     /// These need no security-scoped access — the app owns them.
     static func suggestedFolders() -> [URL] {
@@ -25,6 +56,10 @@ enum SongsFolderService {
 
         return entries
             .filter { (try? $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true }
+            // The library has its own dedicated entry in the picker; listing it
+            // here too would offer the same songs twice, once as a one-off
+            // folder copy and once by reference.
+            .filter { $0.lastPathComponent != libraryFolderName }
             .filter { containsAudio($0) }
             .sorted { $0.lastPathComponent.localizedCaseInsensitiveCompare($1.lastPathComponent) == .orderedAscending }
     }
@@ -53,14 +88,27 @@ enum SongsFolderService {
     /// Writes a short README the first time the app runs so the folder is
     /// visible in Files even before any songs are added.
     static func prepareDocumentsFolder() {
+        // The library folder always exists, so it's visible in Files from the
+        // first launch and an export can be dropped straight into it.
+        try? FileManager.default.createDirectory(
+            at: libraryURL,
+            withIntermediateDirectories: true
+        )
+
         let readme = documentsURL.appendingPathComponent("Add your music here.txt")
         guard !FileManager.default.fileExists(atPath: readme.path) else { return }
 
         let text = """
         BingoBite — Music Folders
 
-        Drop a folder of songs into this BingoBite folder and it will show up as
-        a suggestion when you create a playlist.
+        Library/
+          Your master library. Every song lives here once, and playlists point
+          at it, so the same song used in five playlists is stored one time.
+          Drop songs or a whole folder in here and open the Songs tab.
+
+        Anywhere else in this folder
+          Drop a folder of songs here and it shows up as a suggestion when you
+          create a playlist, kept separate from the library.
 
         Supported formats: \(FolderScannerService.supportedExtensions.sorted().joined(separator: ", "))
 

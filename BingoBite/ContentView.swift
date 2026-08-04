@@ -28,6 +28,8 @@ struct ContentView: View {
             SidebarView(selection: $sidebarSelection)
         } detail: {
             switch sidebarSelection {
+            case .songs:
+                LibrarySongsView()
             case .allPlaylists, .none:
                 PlaylistListView(
                     onSelect: { id in sidebarSelection = .playlist(id) }
@@ -91,7 +93,7 @@ struct ContentView: View {
             let newKind = newValue?.kind
             if oldKind != newKind {
                 audioPlayer.stop()
-                audioPlayer.clearSkipHandlers()
+                audioPlayer.clearPlaybackHandlers()
             }
         }
     }

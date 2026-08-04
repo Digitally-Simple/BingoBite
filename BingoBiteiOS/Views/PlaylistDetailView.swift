@@ -26,7 +26,7 @@ struct PlaylistDetailView: View {
     private var canStart: Bool { playlist.songCount >= requiredSongs && loadError == nil }
 
     private var soundByteLookup: [String: SoundByte] {
-        Dictionary(allSoundBytes.map { ($0.songURLString, $0) }, uniquingKeysWith: { first, _ in first })
+        Dictionary(allSoundBytes.map { ($0.songKey, $0) }, uniquingKeysWith: { first, _ in first })
     }
 
     private var displayedSongs: [Song] {
@@ -39,7 +39,7 @@ struct PlaylistDetailView: View {
     }
 
     private var availableReplacements: [Song] {
-        let used = Set(playlist.songURLStrings)
+        let used = Set(playlist.songKeys)
         return allScannedSongs.filter { !used.contains($0.id.absoluteString) }
     }
 
@@ -286,7 +286,7 @@ struct PlaylistDetailView: View {
 
     private func songRow(_ song: Song) -> some View {
         let isCurrent = audioPlayer.currentSong == song
-        let clip = soundByteLookup[song.id.absoluteString]
+        let clip = soundByteLookup[song.stableKey]
 
         return HStack(spacing: 14) {
             Button {
@@ -381,7 +381,7 @@ struct PlaylistDetailView: View {
     private func applyOverrides() {
         let overrides = SongMetadataService.fetchAll(in: modelContext)
         for index in songs.indices {
-            if let override = overrides[songs[index].id.absoluteString] {
+            if let override = overrides[songs[index].stableKey] {
                 songs[index] = songs[index].applying(override: override)
             }
         }

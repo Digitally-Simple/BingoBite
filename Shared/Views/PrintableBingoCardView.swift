@@ -3,18 +3,32 @@ import SwiftUI
 struct PrintableBingoCardView: View {
     var card: BingoCard
     var songs: [Song]
-    var songURLStrings: [String]
+    var songKeys: [String]
     var settings: CardDesignSettings
 
+    /// The deck's set code. Empty prints the plain card number.
+    var setID: String = ""
+
     private let bingoColumns = ["B", "I", "N", "G", "O"]
-    private let cardAspectRatio: CGFloat = 8.5 / 11.0
+
+    /// `AB-1` when the deck has a set code and set codes are switched on,
+    /// otherwise `Card #1`. Nil hides the label entirely.
+    private var cardLabel: String? {
+        guard settings.showCardNumbers else { return nil }
+        guard settings.showSetID, !setID.isEmpty else { return "Card #\(card.id)" }
+        return "\(setID)-\(card.id)"
+    }
+
+    /// Matches the slot the card is printed into, so a landscape page gets a
+    /// landscape card rather than a portrait one squeezed into the middle.
+    private var cardAspectRatio: CGFloat { settings.cardAspectRatio }
 
     /// Tolerates stale stored paths (moved folder, re-created iOS container).
     private var index: SongIndex { SongIndex(songs) }
 
     private func song(for gridValue: Int) -> Song? {
-        guard gridValue > 0, gridValue <= songURLStrings.count else { return nil }
-        return index.song(for: songURLStrings[gridValue - 1])
+        guard gridValue > 0, gridValue <= songKeys.count else { return nil }
+        return index.song(for: songKeys[gridValue - 1])
     }
 
     var body: some View {
@@ -63,10 +77,10 @@ struct PrintableBingoCardView: View {
             )
 
             // Card number bottom-right
-            if settings.showCardNumbers {
+            if let label = cardLabel {
                 HStack {
                     Spacer()
-                    Text("Card #\(card.id)")
+                    Text(label)
                         .font(settings.font(size: settings.cardNumberFontSize))
                         .foregroundStyle(Color(hex: settings.cardNumberColorHex))
                 }

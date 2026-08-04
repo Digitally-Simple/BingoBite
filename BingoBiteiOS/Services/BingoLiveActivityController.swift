@@ -86,15 +86,15 @@ enum BingoLiveActivityState {
     ) -> BingoGameActivityAttributes.ContentState {
         let cards = CardGenerator.decode(from: game.cardsData)
         let played = BingoGameService.playedSongURLs(
-            shuffledSongs: game.shuffledSongURLStrings,
-            currentIndex: game.currentIndex
+            shuffledSongs: game.shuffledSongKeys,
+            currentIndex: max(game.currentIndex, game.highestPlayedIndex)
         )
 
         var bingoCount = 0
         for (index, grid) in cards.enumerated() {
             let scored = BingoGameService.scoreCard(
                 card: BingoCard(id: index + 1, grid: grid),
-                songURLStrings: game.songURLStrings,
+                songKeys: game.songKeys,
                 playedSongURLs: played,
                 hasFreeSpace: game.hasFreeSpace
             )
@@ -103,7 +103,7 @@ enum BingoLiveActivityState {
 
         return BingoGameActivityAttributes.ContentState(
             round: game.currentIndex + 1,
-            totalRounds: game.shuffledSongURLStrings.count,
+            totalRounds: game.shuffledSongKeys.count,
             songTitle: song?.displayTitle ?? "",
             songArtist: song?.displayArtist ?? "",
             songAlbum: song?.displayAlbum ?? "",
@@ -112,7 +112,7 @@ enum BingoLiveActivityState {
             bingoCount: bingoCount,
             cardCount: cards.count,
             canGoBack: game.currentIndex >= 0,
-            canGoForward: game.currentIndex < game.shuffledSongURLStrings.count - 1
+            canGoForward: game.currentIndex < game.shuffledSongKeys.count - 1
         )
     }
 }

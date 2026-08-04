@@ -28,7 +28,7 @@ struct BingoGameView: View {
 
     private var shuffledSongsBinding: Binding<[String]> {
         Binding(
-            get: { bingoGame.shuffledSongURLStrings },
+            get: { bingoGame.shuffledSongKeys },
             set: { newValue in
                 BingoGameService.updateShuffledOrder(bingoGame, newOrder: newValue, in: modelContext)
             }
@@ -39,7 +39,7 @@ struct BingoGameView: View {
         if bingoGame.isCompleted {
             return "Completed"
         } else if bingoGame.currentIndex >= 0 {
-            return "Song \(bingoGame.currentIndex + 1) of \(bingoGame.shuffledSongURLStrings.count)"
+            return "Song \(bingoGame.currentIndex + 1) of \(bingoGame.shuffledSongKeys.count)"
         } else {
             return "No songs played yet"
         }
@@ -47,8 +47,8 @@ struct BingoGameView: View {
 
     private var currentSong: Song? {
         guard bingoGame.currentIndex >= 0,
-              bingoGame.currentIndex < bingoGame.shuffledSongURLStrings.count else { return nil }
-        let urlString = bingoGame.shuffledSongURLStrings[bingoGame.currentIndex]
+              bingoGame.currentIndex < bingoGame.shuffledSongKeys.count else { return nil }
+        let urlString = bingoGame.shuffledSongKeys[bingoGame.currentIndex]
         return songLookup[urlString]
     }
 
@@ -123,7 +123,7 @@ struct BingoGameView: View {
                     } label: {
                         Image(systemName: "forward.fill")
                     }
-                    .disabled(bingoGame.currentIndex >= bingoGame.shuffledSongURLStrings.count - 1)
+                    .disabled(bingoGame.currentIndex >= bingoGame.shuffledSongKeys.count - 1)
                     .help("Next Song")
                 }
 
@@ -142,7 +142,7 @@ struct BingoGameView: View {
             updateBingoSkipHandlers()
         }
         .onDisappear {
-            audioPlayer.clearSkipHandlers()
+            audioPlayer.clearPlaybackHandlers()
             releaseAccess()
         }
         .onChange(of: bingoGame.currentIndex) {
@@ -237,8 +237,8 @@ struct BingoGameView: View {
 
     private func playSongAtCurrentIndex() {
         guard bingoGame.currentIndex >= 0,
-              bingoGame.currentIndex < bingoGame.shuffledSongURLStrings.count else { return }
-        let urlString = bingoGame.shuffledSongURLStrings[bingoGame.currentIndex]
+              bingoGame.currentIndex < bingoGame.shuffledSongKeys.count else { return }
+        let urlString = bingoGame.shuffledSongKeys[bingoGame.currentIndex]
         if let song = songLookup[urlString] {
             if let soundByte = SoundByteService.fetch(for: song, in: modelContext) {
                 audioPlayer.play(song, from: soundByte.startTime)
@@ -250,18 +250,18 @@ struct BingoGameView: View {
 
     private func endGame() {
         audioPlayer.stop()
-        audioPlayer.clearSkipHandlers()
+        audioPlayer.clearPlaybackHandlers()
         BingoGameService.endGame(bingoGame, in: modelContext)
     }
 
     private func updateBingoSkipHandlers() {
         guard !bingoGame.isCompleted else {
-            audioPlayer.clearSkipHandlers()
+            audioPlayer.clearPlaybackHandlers()
             return
         }
 
         let canBack = bingoGame.currentIndex >= 0
-        let canForward = bingoGame.currentIndex < bingoGame.shuffledSongURLStrings.count - 1
+        let canForward = bingoGame.currentIndex < bingoGame.shuffledSongKeys.count - 1
         let game = bingoGame
         let player = audioPlayer
         let ctx = modelContext
@@ -270,8 +270,8 @@ struct BingoGameView: View {
         player.onSkipForward = canForward ? {
             BingoGameService.advanceToNextSong(game, in: ctx)
             guard game.currentIndex >= 0,
-                  game.currentIndex < game.shuffledSongURLStrings.count else { return }
-            let urlString = game.shuffledSongURLStrings[game.currentIndex]
+                  game.currentIndex < game.shuffledSongKeys.count else { return }
+            let urlString = game.shuffledSongKeys[game.currentIndex]
             if let song = lookup[urlString] {
                 if let soundByte = SoundByteService.fetch(for: song, in: ctx) {
                     player.play(song, from: soundByte.startTime)
@@ -284,8 +284,8 @@ struct BingoGameView: View {
         player.onSkipBackward = canBack ? {
             BingoGameService.goToPreviousSong(game, in: ctx)
             if game.currentIndex >= 0 {
-                guard game.currentIndex < game.shuffledSongURLStrings.count else { return }
-                let urlString = game.shuffledSongURLStrings[game.currentIndex]
+                guard game.currentIndex < game.shuffledSongKeys.count else { return }
+                let urlString = game.shuffledSongKeys[game.currentIndex]
                 if let song = lookup[urlString] {
                     if let soundByte = SoundByteService.fetch(for: song, in: ctx) {
                         player.play(song, from: soundByte.startTime)

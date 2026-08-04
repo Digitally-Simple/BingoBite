@@ -3,7 +3,9 @@ import SwiftData
 
 @Model
 final class SongMetadataOverride {
-    @Attribute(.unique) var songURLString: String
+    /// Stable song key — see `SongKey`. Defaulted so a future schema change
+    /// doesn't fail migration on a mandatory attribute with no value.
+    @Attribute(.unique) var songKey: String = ""
     var title: String?
     var artist: String?
     var album: String?
@@ -13,7 +15,7 @@ final class SongMetadataOverride {
     var comments: String?
 
     init(
-        songURLString: String,
+        songKey: String,
         title: String? = nil,
         artist: String? = nil,
         album: String? = nil,
@@ -22,7 +24,7 @@ final class SongMetadataOverride {
         year: String? = nil,
         comments: String? = nil
     ) {
-        self.songURLString = songURLString
+        self.songKey = songKey
         self.title = title
         self.artist = artist
         self.album = album

@@ -11,6 +11,21 @@ struct Song: Identifiable, Hashable {
     var album: String?
     var artworkData: Data?
 
+    /// `SONG_UID` from the file's tags, when it has one. Only files that came
+    /// through Music Downloader do; music a customer brought themselves won't.
+    var uid: String?
+    /// Path relative to the folder or library root this song was scanned from,
+    /// e.g. `Rick Astley - Never Gonna Give You Up.mp3`.
+    var relativePath: String?
+    /// Genius song id, used to spot the same song under a different upload.
+    var geniusID: Int?
+
+    /// The durable key a playlist stores for this song. UID when present,
+    /// relative path otherwise.
+    var stableKey: String {
+        SongKey.make(uid: uid, relativePath: relativePath, fileName: id.lastPathComponent)
+    }
+
     // Extended metadata (read from file tags written by Music Downloader)
     var genre: String?
     var year: String?

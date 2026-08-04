@@ -2,14 +2,16 @@ import SwiftUI
 import SwiftData
 
 enum SidebarSelection: Hashable {
+    case songs
     case allPlaylists
     case playlist(PersistentIdentifier)
     case allBingoGames
     case bingoGame(PersistentIdentifier)
 
-    enum Kind { case playlist, bingoGame }
+    enum Kind { case songs, playlist, bingoGame }
     var kind: Kind {
         switch self {
+        case .songs: return .songs
         case .allPlaylists, .playlist: return .playlist
         case .allBingoGames, .bingoGame: return .bingoGame
         }
@@ -21,9 +23,21 @@ struct SidebarView: View {
     @Binding var selection: SidebarSelection?
     @Query(sort: \Playlist.name) private var playlists: [Playlist]
     @Query(sort: \BingoGame.creationDate, order: .reverse) private var bingoGames: [BingoGame]
+    @Query private var libraryEntries: [LibraryIndexEntry]
+
+    private var missingSongCount: Int { libraryEntries.count(where: \.isMissing) }
 
     var body: some View {
         List(selection: $selection) {
+            // MARK: - Library
+            Section {
+                Label("Songs", systemImage: "music.note")
+                    .badge(missingSongCount)
+                    .tag(SidebarSelection.songs)
+            } header: {
+                Text("Library")
+            }
+
             // MARK: - Playlists
             Section {
                 Label("All Playlists", systemImage: "list.bullet.rectangle")

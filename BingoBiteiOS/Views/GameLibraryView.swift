@@ -92,7 +92,7 @@ struct GameLibraryView: View {
     }
 
     private func row(_ game: BingoGame) -> some View {
-        let total = max(game.shuffledSongURLStrings.count, 1)
+        let total = max(game.shuffledSongKeys.count, 1)
         let round = max(game.currentIndex + 1, 0)
         let status = Scoreboard.Status.resting(for: game)
 

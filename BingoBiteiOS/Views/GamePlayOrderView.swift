@@ -5,8 +5,13 @@ import SwiftUI
 struct GamePlayOrderView: View {
     @Binding var shuffledSongs: [String]
     var currentIndex: Int
+    var protectedThroughIndex: Int
     var songLookup: SongIndex
     var isCompleted: Bool
+
+    private var reorderBoundary: Int {
+        min(max(protectedThroughIndex + 1, 0), shuffledSongs.count)
+    }
 
     var body: some View {
         List {
@@ -15,12 +20,11 @@ struct GamePlayOrderView: View {
                     .listRowInsets(EdgeInsets(top: 3, leading: 16, bottom: 3, trailing: 16))
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
-                    .moveDisabled(index <= currentIndex || isCompleted)
+                    .moveDisabled(index < reorderBoundary || isCompleted)
             }
             .onMove { source, destination in
                 // Never let a drag land inside the already-played region.
-                let boundary = currentIndex + 1
-                shuffledSongs.move(fromOffsets: source, toOffset: max(destination, boundary))
+                shuffledSongs.move(fromOffsets: source, toOffset: max(destination, reorderBoundary))
             }
         }
         .listStyle(.plain)

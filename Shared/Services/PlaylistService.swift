@@ -34,6 +34,12 @@ enum PlaylistService {
 
     // MARK: - Fetch
 
+    /// Set codes already in use, so a new deck never collides with one that
+    /// might be sitting in the same pile of printed cards.
+    static func usedSetIDs(in context: ModelContext) -> Set<String> {
+        Set(fetchAll(in: context).map(\.setID).filter { !$0.isEmpty })
+    }
+
     static func fetchAll(in context: ModelContext) -> [Playlist] {
         let descriptor = FetchDescriptor<Playlist>(
             sortBy: [SortDescriptor(\.creationDate)]
@@ -66,10 +72,13 @@ enum PlaylistService {
         }
 
         let bookmarkData = try BookmarkService.createBookmark(for: folderURL)
-        let songURLStrings = includedSongs.map { $0.id.absoluteString }
+        // Stable keys, not absolute URLs: the UID when the file carries one,
+        // the relative path otherwise. Card grids index into this array
+        // 1-based, so its order and length are load-bearing from here on.
+        let songKeys = includedSongs.map(\.stableKey)
         let grids = CardGenerator.generate(
             numberOfCards: numberOfCards,
-            numberOfSongs: songURLStrings.count,
+            numberOfSongs: songKeys.count,
             hasFreeSpace: hasFreeSpace
         )
         let cardsData = CardGenerator.encode(grids)
@@ -83,15 +92,60 @@ enum PlaylistService {
             descriptionText: description,
             folderPath: folderURL.path,
             bookmarkData: bookmarkData,
-            songURLStrings: songURLStrings,
+            songKeys: songKeys,
             numberOfCards: numberOfCards,
             hasFreeSpace: hasFreeSpace,
             cardsData: cardsData,
             coverArtData: coverArtData
         )
+        playlist.setID = Playlist.generateSetID(avoiding: usedSetIDs(in: context))
         context.insert(playlist)
         try context.save()
         return playlist
+    }
+
+    // MARK: - Duplicate
+
+    /// Copies a playlist under a new name.
+    ///
+    /// Regenerates the card grids rather than copying them — two playlists
+    /// sharing identical cards would make every game of one a replay of the
+    /// other. The song list and its order are preserved exactly.
+    @MainActor
+    @discardableResult
+    static func duplicate(
+        _ playlist: Playlist,
+        name: String,
+        in context: ModelContext
+    ) throws -> Playlist {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let finalName = trimmed.isEmpty ? "\(playlist.name) copy" : trimmed
+
+        let grids = CardGenerator.generate(
+            numberOfCards: playlist.numberOfCards,
+            numberOfSongs: playlist.songKeys.count,
+            hasFreeSpace: playlist.hasFreeSpace
+        )
+
+        let copy = Playlist(
+            name: finalName,
+            descriptionText: playlist.descriptionText,
+            folderPath: playlist.folderPath,
+            bookmarkData: playlist.bookmarkData,
+            songKeys: playlist.songKeys,
+            numberOfCards: playlist.numberOfCards,
+            hasFreeSpace: playlist.hasFreeSpace,
+            cardsData: CardGenerator.encode(grids),
+            coverArtData: playlist.coverArtData,
+            cardDesignData: playlist.cardDesignData
+        )
+        // A duplicate is a physically different deck with different grids, so
+        // it must not inherit the original's set code — that's exactly the
+        // collision the codes exist to prevent.
+        copy.setID = Playlist.generateSetID(avoiding: usedSetIDs(in: context))
+        context.insert(copy)
+        try context.save()
+        return copy
     }
 
     // MARK: - Loading songs for an existing playlist
@@ -120,17 +174,18 @@ enum PlaylistService {
             var missingTracks: [MissingTrack] = []
             var relinked: [(Int, String)] = []
 
-            for (position, urlString) in playlist.songURLStrings.enumerated() {
-                guard let song = index.song(for: urlString) else {
-                    missingTracks.append(MissingTrack(index: position, originalURLString: urlString))
+            for (position, key) in playlist.songKeys.enumerated() {
+                guard let song = index.song(for: key) else {
+                    missingTracks.append(MissingTrack(index: position, originalURLString: key))
                     continue
                 }
                 songs.append(song)
 
-                // Matched by file name, so the stored path is stale — the folder
-                // moved, or iOS re-created the app's data container.
-                let current = song.id.absoluteString
-                if current != urlString {
+                // Resolved on a weaker rung than it was stored on — the file
+                // was renamed, the folder moved, or iOS re-created the app's
+                // data container. Heal it so the next load matches exactly.
+                let current = song.stableKey
+                if current != key {
                     relinked.append((position, current))
                 }
             }
@@ -140,7 +195,7 @@ enum PlaylistService {
             if let context {
                 let folderMoved = playlist.folderPath != url.path
                 for (position, urlString) in relinked {
-                    playlist.songURLStrings[position] = urlString
+                    playlist.songKeys[position] = urlString
                 }
                 if folderMoved {
                     playlist.folderPath = url.path
@@ -159,7 +214,7 @@ enum PlaylistService {
 
     // MARK: - Track replacement
 
-    /// Replaces a missing track's URL at the given index in the playlist's songURLStrings.
+    /// Replaces a missing track's URL at the given index in the playlist's songKeys.
     /// Deletes any SongMetadataOverride and SoundByte associated with the old URL.
     @MainActor
     static func replaceTrack(
@@ -168,14 +223,15 @@ enum PlaylistService {
         with newSong: Song,
         in context: ModelContext
     ) {
-        let oldURLString = playlist.songURLStrings[index]
+        let oldKey = playlist.songKeys[index]
 
-        // Swap the URL
-        playlist.songURLStrings[index] = newSong.id.absoluteString
+        // Replace in place — the array is positional and card grids index into
+        // it, so the length must not change. Stable key, not an absolute URL.
+        playlist.songKeys[index] = newSong.stableKey
 
         // Delete old SongMetadataOverride
         let overrideDescriptor = FetchDescriptor<SongMetadataOverride>(
-            predicate: #Predicate { $0.songURLString == oldURLString }
+            predicate: #Predicate { $0.songKey == oldKey }
         )
         if let oldOverride = try? context.fetch(overrideDescriptor).first {
             context.delete(oldOverride)
@@ -183,7 +239,7 @@ enum PlaylistService {
 
         // Delete old SoundByte
         let soundByteDescriptor = FetchDescriptor<SoundByte>(
-            predicate: #Predicate { $0.songURLString == oldURLString }
+            predicate: #Predicate { $0.songKey == oldKey }
         )
         if let oldSoundByte = try? context.fetch(soundByteDescriptor).first {
             context.delete(oldSoundByte)

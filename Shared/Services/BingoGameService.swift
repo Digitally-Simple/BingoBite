@@ -19,11 +19,11 @@ enum BingoGameService {
             name: gameName,
             playlistUUID: playlist.uuid,
             playlistName: playlist.name,
-            songURLStrings: playlist.songURLStrings,
+            songKeys: playlist.songKeys,
             cardsData: playlist.cardsData,
             numberOfCards: playlist.numberOfCards,
             hasFreeSpace: playlist.hasFreeSpace,
-            shuffledSongURLStrings: playlist.songURLStrings.shuffled()
+            shuffledSongKeys: playlist.songKeys.shuffled()
         )
         context.insert(game)
         try? context.save()
@@ -36,19 +36,46 @@ enum BingoGameService {
     }
 
     static func advanceToNextSong(_ game: BingoGame, in context: ModelContext) {
-        guard game.currentIndex < game.shuffledSongURLStrings.count - 1 else { return }
+        guard game.currentIndex < game.shuffledSongKeys.count - 1 else { return }
         game.currentIndex += 1
+        game.highestPlayedIndex = max(game.highestPlayedIndex, game.currentIndex)
         try? context.save()
     }
 
     static func goToPreviousSong(_ game: BingoGame, in context: ModelContext) {
         guard game.currentIndex >= 0 else { return }
+        game.highestPlayedIndex = max(game.highestPlayedIndex, game.currentIndex)
         game.currentIndex -= 1
         try? context.save()
     }
 
+    static func recordCurrentProgress(_ game: BingoGame, in context: ModelContext) {
+        guard game.currentIndex > game.highestPlayedIndex else { return }
+        game.highestPlayedIndex = game.currentIndex
+        try? context.save()
+    }
+
     static func updateShuffledOrder(_ game: BingoGame, newOrder: [String], in context: ModelContext) {
-        game.shuffledSongURLStrings = newOrder
+        game.shuffledSongKeys = newOrder
+        try? context.save()
+    }
+
+    static func reshuffleRemainingSongs(
+        _ game: BingoGame,
+        includePreviouslyPlayed: Bool,
+        in context: ModelContext
+    ) {
+        guard game.shuffledSongKeys.count > 1 else { return }
+
+        let protectedIndex = includePreviouslyPlayed
+            ? game.currentIndex
+            : max(game.currentIndex, game.highestPlayedIndex)
+        let boundary = min(max(protectedIndex + 1, 0), game.shuffledSongKeys.count)
+        guard boundary < game.shuffledSongKeys.count else { return }
+
+        let locked = Array(game.shuffledSongKeys.prefix(boundary))
+        let shuffled = Array(game.shuffledSongKeys.suffix(from: boundary)).shuffled()
+        game.shuffledSongKeys = locked + shuffled
         try? context.save()
     }
 
@@ -72,7 +99,7 @@ enum BingoGameService {
 
     static func scoreCard(
         card: BingoCard,
-        songURLStrings: [String],
+        songKeys: [String],
         playedSongURLs: Set<String>,
         hasFreeSpace: Bool
     ) -> [[CellState]] {
@@ -81,8 +108,8 @@ enum BingoGameService {
                 if value == 0 {
                     return .played // free space always counts as played
                 }
-                guard value > 0, value <= songURLStrings.count else { return .unplayed }
-                let url = songURLStrings[value - 1]
+                guard value > 0, value <= songKeys.count else { return .unplayed }
+                let url = songKeys[value - 1]
                 return playedSongURLs.contains(url) ? .played : .unplayed
             }
         }
@@ -128,13 +155,13 @@ enum BingoGameService {
 
     static func cardStats(
         card: BingoCard,
-        songURLStrings: [String],
+        songKeys: [String],
         playedSongURLs: Set<String>,
         hasFreeSpace: Bool
     ) -> (hitsCount: Int, bingoCount: Int) {
         let scored = scoreCard(
             card: card,
-            songURLStrings: songURLStrings,
+            songKeys: songKeys,
             playedSongURLs: playedSongURLs,
             hasFreeSpace: hasFreeSpace
         )
@@ -165,7 +192,7 @@ enum BingoGameService {
 
     static func firstBingoRound(
         card: BingoCard,
-        songURLStrings: [String],
+        songKeys: [String],
         shuffledSongs: [String],
         hasFreeSpace: Bool
     ) -> Int? {
@@ -174,7 +201,7 @@ enum BingoGameService {
             played.insert(shuffledSongs[round - 1])
             let scored = scoreCard(
                 card: card,
-                songURLStrings: songURLStrings,
+                songKeys: songKeys,
                 playedSongURLs: played,
                 hasFreeSpace: hasFreeSpace
             )

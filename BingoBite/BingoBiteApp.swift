@@ -15,12 +15,9 @@ struct BingoBiteApp: App {
 
     private let updaterController: SPUStandardUpdaterController
 
-    private static let schemaVersionKey = "BingoBite.SchemaVersion"
-    private static let currentSchemaVersion = 3
-
     init() {
         Self.resetStoreIfNeeded()
-        let container = try! ModelContainer(for: AppSettings.self, SoundByte.self, Playlist.self, BingoGame.self, SongMetadataOverride.self)
+        let container = Self.makeContainer()
         self.container = container
         self.updaterController = SPUStandardUpdaterController(
             startingUpdater: true,
@@ -29,19 +26,44 @@ struct BingoBiteApp: App {
         )
     }
 
-    private static func resetStoreIfNeeded() {
-        let defaults = UserDefaults.standard
-        if defaults.integer(forKey: schemaVersionKey) >= currentSchemaVersion { return }
+    /// Opens the store, archiving and retrying once if it can't be read.
+    ///
+    /// A schema change that isn't matched by a version bump makes SwiftData
+    /// refuse the store outright. On `try!` that was a crash on launch with no
+    /// route back short of deleting the app.
+    private static func makeContainer() -> ModelContainer {
+        let schema = Schema([
+            AppSettings.self,
+            SoundByte.self,
+            Playlist.self,
+            BingoGame.self,
+            SongMetadataOverride.self,
+            LibraryRoot.self,
+            LibraryIndexEntry.self,
+        ] as [any PersistentModel.Type])
 
-        let fm = FileManager.default
-        if let appSupport = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
-            let bundleID = Bundle.main.bundleIdentifier ?? "BingoBite"
-            let storeDir = appSupport.appendingPathComponent(bundleID, isDirectory: true)
-            for suffix in ["default.store", "default.store-shm", "default.store-wal"] {
-                try? fm.removeItem(at: storeDir.appendingPathComponent(suffix))
+        do {
+            return try ModelContainer(for: schema)
+        } catch {
+            let fm = FileManager.default
+            if let appSupport = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
+                let bundleID = Bundle.main.bundleIdentifier ?? "BingoBite"
+                StoreResetService.forceArchive(
+                    storeDirectory: appSupport.appendingPathComponent(bundleID, isDirectory: true)
+                )
             }
+            return try! ModelContainer(for: schema)
         }
-        defaults.set(currentSchemaVersion, forKey: schemaVersionKey)
+    }
+
+    private static func resetStoreIfNeeded() {
+        let fm = FileManager.default
+        guard let appSupport = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+        else { return }
+        let bundleID = Bundle.main.bundleIdentifier ?? "BingoBite"
+        StoreResetService.resetIfNeeded(
+            storeDirectory: appSupport.appendingPathComponent(bundleID, isDirectory: true)
+        )
     }
 
     var body: some Scene {

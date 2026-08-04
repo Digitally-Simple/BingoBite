@@ -3,15 +3,19 @@ import SwiftUI
 struct CardWithOverlaysView: View {
     var card: BingoCard
     var songs: [Song]
-    var songURLStrings: [String]
+    var songKeys: [String]
     var settings: CardDesignSettings
+    /// The deck's set code, printed with the card number as `AB-1`. Empty
+    /// falls back to `Card #1`.
+    var setID: String = ""
 
     var body: some View {
         PrintableBingoCardView(
             card: card,
             songs: songs,
-            songURLStrings: songURLStrings,
-            settings: settings
+            songKeys: songKeys,
+            settings: settings,
+            setID: setID
         )
         .overlay {
             GeometryReader { geo in

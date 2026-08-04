@@ -3,9 +3,11 @@ import SwiftUI
 struct CardDesignPreviewView: View {
     var cards: [BingoCard]
     var songs: [Song]
-    var songURLStrings: [String]
+    var songKeys: [String]
     @Binding var settings: CardDesignSettings
     @Binding var selectedOverlayID: String?
+    /// The deck's set code, printed alongside each card number.
+    var setID: String = ""
 
     @State private var selectedCardIndex: Int = 0
     @State private var dragOffset: CGSize = .zero
@@ -61,40 +63,69 @@ struct CardDesignPreviewView: View {
     /// Page margin as a fraction of page size (matches PDF: 36pt on 612pt width)
     private let pageMarginFraction: CGFloat = 36.0 / 612.0
 
+    /// The printed sheet, laid out by the same geometry the PDF exporter uses,
+    /// so what's on screen is what comes out of the printer.
     private var cardPreview: some View {
-        // Simulate the PDF page: card inside margins, letter aspect ratio
-        ZStack {
-            // Page background
-            Color.white
+        GeometryReader { geo in
+            ZStack(alignment: .topLeading) {
+                Color.white
 
-            // Card centered within page margins
-            ZStack {
-                CardWithOverlaysView(
-                    card: cards[selectedCardIndex],
-                    songs: songs,
-                    songURLStrings: songURLStrings,
-                    settings: settings
-                )
-
-                // Interactive gesture handles (preview only)
-                GeometryReader { geo in
-                    Color.clear
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            selectedOverlayID = nil
-                        }
-
-                    ForEach(Array(settings.imageOverlays.enumerated()), id: \.element.id) { index, overlay in
-                        overlayHandle(index: index, overlay: overlay, geoSize: geo.size)
-                    }
+                ForEach(0..<max(settings.cardsPerPage, 1), id: \.self) { slot in
+                    let rect = settings.cardRect(forSlot: slot, scaledTo: geo.size)
+                    cardSlot(slot: slot, canvas: rect.size)
+                        .frame(width: rect.width, height: rect.height)
+                        .offset(x: rect.minX, y: rect.minY)
                 }
             }
-            .padding(pageMarginFraction * 420)
         }
-        .aspectRatio(8.5 / 11.0, contentMode: .fit)
+        .aspectRatio(settings.pageAspectRatio, contentMode: .fit)
         .frame(maxWidth: 420)
         .clipShape(RoundedRectangle(cornerRadius: 4))
         .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
+        .animation(.easeInOut(duration: 0.2), value: settings.pageOrientation)
+        .animation(.easeInOut(duration: 0.2), value: settings.cardsPerPage)
+    }
+
+    /// One card on the sheet, composed at the exporter's reference width and
+    /// scaled down. Font sizes are absolute points, so composing straight into
+    /// a small 4-up slot collapses the grid.
+    ///
+    /// Overlays are draggable on the first slot only; the rest show the
+    /// arrangement.
+    @ViewBuilder
+    private func cardSlot(slot: Int, canvas: CGSize) -> some View {
+        let cardIndex = (selectedCardIndex + slot) % max(cards.count, 1)
+
+        if cards.indices.contains(cardIndex) {
+            ZStack {
+                CardWithOverlaysView(
+                    card: cards[cardIndex],
+                    songs: songs,
+                    songKeys: songKeys,
+                    settings: settings,
+                    setID: setID
+                )
+                .frame(
+                    width: CardDesignSettings.cardReferenceSize.width,
+                    height: CardDesignSettings.cardReferenceSize.height
+                )
+                .scaleEffect(canvas.width / CardDesignSettings.cardReferenceWidth, anchor: .center)
+                .frame(width: canvas.width, height: canvas.height)
+                .clipped()
+
+                if slot == 0 {
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .onTapGesture { selectedOverlayID = nil }
+
+                    GeometryReader { geo in
+                        ForEach(Array(settings.imageOverlays.enumerated()), id: \.element.id) { index, overlay in
+                            overlayHandle(index: index, overlay: overlay, geoSize: geo.size)
+                        }
+                    }
+                }
+            }
+        }
     }
 
     // MARK: - Overlay Handle

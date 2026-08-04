@@ -114,9 +114,12 @@ struct MeterLane: View {
     var height: CGFloat = 6
     var labelColor: Color = BingoActivityTheme.dim
     var trackColor: Color = BingoActivityTheme.faint
+    /// Gap between the label row and the ticks. Tightened on the Lock Screen,
+    /// where every point of height is spoken for.
+    var labelSpacing: CGFloat = 3
 
     var body: some View {
-        VStack(spacing: 3) {
+        VStack(spacing: labelSpacing) {
             HStack(spacing: 8) {
                 Text(title)
                     .font(.system(size: 9, weight: .heavy))
@@ -146,9 +149,14 @@ struct BingoMeters: View {
     var height: CGFloat = 6
     var labelColor: Color = BingoActivityTheme.dim
     var trackColor: Color = BingoActivityTheme.faint
+    /// Side by side where there's width to spend and height to save — the Lock
+    /// Screen card, which the system caps at about 160pt. Stacked in the
+    /// Dynamic Island, which has the opposite problem.
+    var isSideBySide = false
+    var labelSpacing: CGFloat = 3
 
     var body: some View {
-        VStack(spacing: compact ? 5 : 7) {
+        let lanes = Group {
             MeterLane(
                 title: "ROUNDS CALLED",
                 filled: max(0, state.round),
@@ -157,7 +165,8 @@ struct BingoMeters: View {
                 isMuted: state.round <= 0,
                 height: height,
                 labelColor: labelColor,
-                trackColor: trackColor
+                trackColor: trackColor,
+                labelSpacing: labelSpacing
             )
 
             MeterLane(
@@ -168,8 +177,15 @@ struct BingoMeters: View {
                 isMuted: state.bingoCount == 0,
                 height: height,
                 labelColor: labelColor,
-                trackColor: trackColor
+                trackColor: trackColor,
+                labelSpacing: labelSpacing
             )
+        }
+
+        if isSideBySide {
+            HStack(spacing: 16) { lanes }
+        } else {
+            VStack(spacing: compact ? 5 : 7) { lanes }
         }
     }
 }

@@ -20,7 +20,7 @@ struct BingoGameBoardsView: View {
 
     private var playedURLs: Set<String> {
         BingoGameService.playedSongURLs(
-            shuffledSongs: bingoGame.shuffledSongURLStrings,
+            shuffledSongs: bingoGame.shuffledSongKeys,
             currentIndex: bingoGame.currentIndex
         )
     }
@@ -56,15 +56,15 @@ struct BingoGameBoardsView: View {
                             ForEach(cards) { card in
                                 let scored = BingoGameService.scoreCard(
                                     card: card,
-                                    songURLStrings: bingoGame.songURLStrings,
+                                    songKeys: bingoGame.songKeys,
                                     playedSongURLs: playedURLs,
                                     hasFreeSpace: bingoGame.hasFreeSpace
                                 )
                                 BingoGameCardView(
                                     card: card,
                                     scoredMatrix: scored,
-                                    songURLStrings: bingoGame.songURLStrings,
-                                    shuffledSongs: bingoGame.shuffledSongURLStrings,
+                                    songKeys: bingoGame.songKeys,
+                                    shuffledSongs: bingoGame.shuffledSongKeys,
                                     currentIndex: bingoGame.currentIndex,
                                     songLookup: songLookup
                                 )

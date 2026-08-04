@@ -3,9 +3,10 @@ import SwiftData
 
 enum SongMetadataService {
     static func fetch(for song: Song, in context: ModelContext) -> SongMetadataOverride? {
-        let urlString = song.id.absoluteString
+        // Stable key, not the absolute URL: a renamed file keeps its edits.
+        let key = song.stableKey
         let descriptor = FetchDescriptor<SongMetadataOverride>(
-            predicate: #Predicate { $0.songURLString == urlString }
+            predicate: #Predicate { $0.songKey == key }
         )
         return try? context.fetch(descriptor).first
     }
@@ -13,7 +14,7 @@ enum SongMetadataService {
     static func fetchAll(in context: ModelContext) -> [String: SongMetadataOverride] {
         let descriptor = FetchDescriptor<SongMetadataOverride>()
         let all = (try? context.fetch(descriptor)) ?? []
-        return Dictionary(uniqueKeysWithValues: all.map { ($0.songURLString, $0) })
+        return Dictionary(uniqueKeysWithValues: all.map { ($0.songKey, $0) })
     }
 
     static func save(
@@ -37,7 +38,7 @@ enum SongMetadataService {
             existing.comments = comments
         } else {
             let override = SongMetadataOverride(
-                songURLString: song.id.absoluteString,
+                songKey: song.stableKey,
                 title: title,
                 artist: artist,
                 album: album,

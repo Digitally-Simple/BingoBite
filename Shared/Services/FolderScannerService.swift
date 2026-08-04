@@ -12,38 +12,48 @@ enum FolderScannerService {
         #endif
     }()
 
-    static func scanForAudio(in folderURL: URL) async throws -> [Song] {
-        let fileManager = FileManager.default
-        let contents = try fileManager.contentsOfDirectory(
-            at: folderURL,
-            includingPropertiesForKeys: [.fileSizeKey],
-            options: .skipsHiddenFiles
-        )
-
-        let audioFiles = contents.filter { supportedExtensions.contains($0.pathExtension.lowercased()) }
+    /// - Parameter recursive: walks subfolders too. Off by default so the
+    ///   existing per-playlist folder pickers behave exactly as before; the
+    ///   master library turns it on.
+    static func scanForAudio(in folderURL: URL, recursive: Bool = false) async throws -> [Song] {
+        let audioFiles = try audioFileURLs(in: folderURL, recursive: recursive)
 
         var songs: [Song] = []
         for fileURL in audioFiles {
-            let resourceValues = try fileURL.resourceValues(forKeys: [.fileSizeKey])
-            let fileSize = Int64(resourceValues.fileSize ?? 0)
+            if let song = try await scanFile(at: fileURL, under: folderURL) {
+                songs.append(song)
+            }
+        }
 
-            // AVFoundation: artwork + duration only
-            let asset = AVURLAsset(url: fileURL)
-            let duration = try await asset.load(.duration)
-            let commonMetadata = try await asset.load(.commonMetadata)
-            var artwork = await artworkData(in: commonMetadata)
+        return songs.sorted { $0.displayTitle.localizedCaseInsensitiveCompare($1.displayTitle) == .orderedAscending }
+    }
 
-            // Text metadata as flat key-value pairs: ffmpeg on macOS, native
-            // container parsing on iOS (no process spawning there).
-            #if os(macOS)
-            let tags = probeTags(for: fileURL)
-            #else
-            let parsed = AudioTagReader.read(url: fileURL)
-            let tags = parsed.tags
-            artwork = artwork ?? parsed.artwork
-            #endif
+    /// Reads one file. Split out of `scanForAudio` so the library index can
+    /// re-read a single changed file without walking its whole directory —
+    /// doing that per file made a rescan quadratic.
+    ///
+    /// - Parameter root: the folder `relativePath` is measured from.
+    static func scanFile(at fileURL: URL, under root: URL) async throws -> Song? {
+        let resourceValues = try fileURL.resourceValues(forKeys: [.fileSizeKey])
+        let fileSize = Int64(resourceValues.fileSize ?? 0)
 
-            let song = Song(
+        // AVFoundation: artwork + duration only
+        let asset = AVURLAsset(url: fileURL)
+        let duration = try await asset.load(.duration)
+        let commonMetadata = try await asset.load(.commonMetadata)
+        var artwork = await artworkData(in: commonMetadata)
+
+        // Text metadata as flat key-value pairs: ffmpeg on macOS, native
+        // container parsing on iOS (no process spawning there).
+        #if os(macOS)
+        let tags = probeTags(for: fileURL)
+        #else
+        let parsed = AudioTagReader.read(url: fileURL)
+        let tags = parsed.tags
+        artwork = artwork ?? parsed.artwork
+        #endif
+
+        return Song(
                 id: fileURL,
                 fileName: fileURL.deletingPathExtension().lastPathComponent,
                 fileSize: fileSize,
@@ -52,6 +62,11 @@ enum FolderScannerService {
                 title: tags["title"],
                 album: tags["album"],
                 artworkData: artwork,
+                // Identity frames written by Music Downloader. Absent for music
+                // a customer brought themselves, which is the normal case.
+                uid: tag(tags, SongUID.uidKey),
+                relativePath: relativePath(of: fileURL, under: root),
+                geniusID: tag(tags, SongUID.geniusIDKey).flatMap(Int.init),
                 genre: tags["genre"],
                 year: extractYear(from: tags["date"]),
                 comments: tags["USER_NOTES"],
@@ -67,11 +82,64 @@ enum FolderScannerService {
                 mediaLinks: decodeJSON([MediaLink].self, from: tags["MEDIA_LINKS"]),
                 songRelationships: decodeJSON([SongRelationshipEntry].self, from: tags["RELATIONSHIPS"]),
                 geniusURL: tags["GENIUS_URL"].flatMap { URL(string: $0) }
+        )
+    }
+
+    // MARK: - Enumeration
+
+    /// Every supported audio file under `folderURL`, sorted for a stable order.
+    static func audioFileURLs(in folderURL: URL, recursive: Bool) throws -> [URL] {
+        let fileManager = FileManager.default
+
+        guard recursive else {
+            let contents = try fileManager.contentsOfDirectory(
+                at: folderURL,
+                includingPropertiesForKeys: [.fileSizeKey],
+                options: .skipsHiddenFiles
             )
-            songs.append(song)
+            return contents
+                .filter { supportedExtensions.contains($0.pathExtension.lowercased()) }
+                .sorted { $0.path < $1.path }
         }
 
-        return songs.sorted { $0.displayTitle.localizedCaseInsensitiveCompare($1.displayTitle) == .orderedAscending }
+        guard let enumerator = fileManager.enumerator(
+            at: folderURL,
+            includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey],
+            options: [.skipsHiddenFiles, .skipsPackageDescendants]
+        ) else { return [] }
+
+        var results: [URL] = []
+        for case let url as URL in enumerator {
+            guard supportedExtensions.contains(url.pathExtension.lowercased()) else { continue }
+            let isRegular = (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) ?? false
+            guard isRegular else { continue }
+            results.append(url)
+        }
+        return results.sorted { $0.path < $1.path }
+    }
+
+    /// Path of `url` relative to `root`, or just the file name when it isn't
+    /// under `root` at all.
+    static func relativePath(of url: URL, under root: URL) -> String {
+        let rootPath = root.standardizedFileURL.path
+        let filePath = url.standardizedFileURL.path
+        guard filePath.hasPrefix(rootPath) else { return url.lastPathComponent }
+        let relative = String(filePath.dropFirst(rootPath.count))
+        return relative.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+    }
+
+    /// Case-insensitive tag lookup.
+    ///
+    /// ffmpeg doesn't guarantee the case it writes Vorbis comment keys in, and
+    /// `AudioTagReader` passes unknown keys through verbatim, so a bare
+    /// subscript silently misses the identity frames on flac and m4a.
+    static func tag(_ tags: [String: String], _ key: String) -> String? {
+        if let exact = tags[key], !exact.isEmpty { return exact }
+        let lowered = key.lowercased()
+        for (candidate, value) in tags where candidate.lowercased() == lowered {
+            return value.isEmpty ? nil : value
+        }
+        return nil
     }
 
     // MARK: - ffprobe metadata (macOS only — iOS cannot spawn processes)

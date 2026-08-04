@@ -39,10 +39,122 @@ struct CardDesignSettings: Codable, Equatable {
     var showCardNumbers: Bool = true
     var cardNumberFontSize: CGFloat = 10
     var cardNumberColorHex: String = "#999999"
+    /// Print the deck's set code alongside the number, `AB-1` rather than
+    /// `Card #1`, so shuffled decks can be told apart.
+    var showSetID: Bool = true
 
     // MARK: - Page Layout
     var cardsPerPage: Int = 1
     var pageOrientation: String = "portrait"
+
+    // MARK: - Page geometry
+    //
+    // One source of truth for page and card shape. These used to be a
+    // hardcoded `8.5 / 11.0` in seven places, which meant switching to
+    // landscape resized the paper but left the card portrait — so the card
+    // just shrank and the preview never changed at all.
+
+    /// US Letter in points, long edge horizontal when landscape.
+    static let letterShortEdge: CGFloat = 612
+    static let letterLongEdge: CGFloat = 792
+
+    static let pageMargin: CGFloat = 36
+    static let cardSpacing: CGFloat = 12
+
+    /// Width every card is laid out at before being scaled to its slot.
+    ///
+    /// Font sizes are absolute points, so a card composed directly into a
+    /// small frame collapses — the text can't shrink and the grid gets
+    /// squeezed. Both the PDF exporter and the preview compose at this width
+    /// and scale the result, which keeps everything proportional and makes the
+    /// two match.
+    static let cardReferenceWidth: CGFloat = 370
+
+    static var cardReferenceSize: CGSize {
+        CGSize(width: cardReferenceWidth, height: cardReferenceWidth / cardAspectRatio)
+    }
+
+    var isLandscape: Bool { pageOrientation == "landscape" }
+
+    var pageSize: CGSize {
+        isLandscape
+            ? CGSize(width: Self.letterLongEdge, height: Self.letterShortEdge)
+            : CGSize(width: Self.letterShortEdge, height: Self.letterLongEdge)
+    }
+
+    var pageAspectRatio: CGFloat { pageSize.width / pageSize.height }
+
+    /// How cards are arranged on the sheet.
+    ///
+    /// Two-up flips with the paper: stacked on portrait, side by side on
+    /// landscape. Keeping it stacked on landscape would waste most of the
+    /// width and print two tiny cards.
+    var grid: (columns: Int, rows: Int) {
+        switch max(cardsPerPage, 1) {
+        case 1:  (1, 1)
+        case 2:  isLandscape ? (2, 1) : (1, 2)
+        case 4:  (2, 2)
+        default: (1, 1)
+        }
+    }
+
+    /// A bingo card is always 8.5:11, whatever the paper is doing.
+    ///
+    /// Orientation and cards-per-sheet change how many cards fit and where
+    /// they sit — never the card's proportions. Letting a card stretch to fill
+    /// its slot distorts the grid and looks wrong.
+    static let cardAspectRatio: CGFloat = 8.5 / 11.0
+    var cardAspectRatio: CGFloat { Self.cardAspectRatio }
+
+    /// The area available to one card, before the card's own ratio is applied.
+    var cardSlotSize: CGSize {
+        let grid = grid
+        let usableWidth = pageSize.width - (Self.pageMargin * 2)
+        let usableHeight = pageSize.height - (Self.pageMargin * 2)
+        let width = (usableWidth - Self.cardSpacing * CGFloat(grid.columns - 1)) / CGFloat(grid.columns)
+        let height = (usableHeight - Self.cardSpacing * CGFloat(grid.rows - 1)) / CGFloat(grid.rows)
+        return CGSize(width: width, height: height)
+    }
+
+    /// The card's printed size: the largest 8.5:11 rectangle that fits the slot.
+    var cardSize: CGSize {
+        let slot = cardSlotSize
+        let width = min(slot.width, slot.height * Self.cardAspectRatio)
+        return CGSize(width: width, height: width / Self.cardAspectRatio)
+    }
+
+    /// Frame for the card in the given slot, with the whole block of cards
+    /// centred on the sheet.
+    func cardRect(forSlot slot: Int) -> CGRect {
+        let grid = grid
+        let size = cardSize
+        let totalWidth = size.width * CGFloat(grid.columns) + Self.cardSpacing * CGFloat(grid.columns - 1)
+        let totalHeight = size.height * CGFloat(grid.rows) + Self.cardSpacing * CGFloat(grid.rows - 1)
+        let originX = (pageSize.width - totalWidth) / 2
+        let originY = (pageSize.height - totalHeight) / 2
+
+        let column = slot % grid.columns
+        let row = slot / grid.columns
+        return CGRect(
+            x: originX + CGFloat(column) * (size.width + Self.cardSpacing),
+            y: originY + CGFloat(row) * (size.height + Self.cardSpacing),
+            width: size.width,
+            height: size.height
+        )
+    }
+
+    /// The same rect expressed in a preview of `previewSize`, so the on-screen
+    /// sheet and the PDF are laid out by identical maths.
+    func cardRect(forSlot slot: Int, scaledTo previewSize: CGSize) -> CGRect {
+        let scale = previewSize.width / pageSize.width
+        let rect = cardRect(forSlot: slot)
+        return CGRect(
+            x: rect.origin.x * scale,
+            y: rect.origin.y * scale,
+            width: rect.width * scale,
+            height: rect.height * scale
+        )
+    }
 
     // MARK: - Image Overlays
     var imageOverlays: [ImageOverlay] = []

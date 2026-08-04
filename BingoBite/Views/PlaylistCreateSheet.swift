@@ -27,11 +27,44 @@ struct PlaylistCreateSheet: View {
 
     // Create feedback
     @State private var createError: String?
+    @State private var songSearch = ""
+    @State private var cardCountText = "10"
 
     // Completion callback — parent can use this to select the new playlist
     var onCreated: (Playlist) -> Void = { _ in }
 
     private var requiredSongs: Int { hasFreeSpace ? 24 : 25 }
+
+    static let cardRange = 1...500
+
+    private func clampCardCount() {
+        numberOfCards = min(max(numberOfCards, Self.cardRange.lowerBound), Self.cardRange.upperBound)
+        cardCountText = String(numberOfCards)
+    }
+
+    private var isSearching: Bool {
+        !songSearch.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// The songs the list is currently showing. Include/exclude act on this,
+    /// not on everything scanned.
+    private var visibleSongs: [Song] {
+        let query = songSearch.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return scannedSongs }
+        return scannedSongs.filter {
+            $0.displayTitle.localizedCaseInsensitiveContains(query)
+                || $0.displayArtist.localizedCaseInsensitiveContains(query)
+                || ($0.album?.localizedCaseInsensitiveContains(query) ?? false)
+        }
+    }
+
+    private func include(_ songs: [Song]) {
+        for song in songs { excluded.remove(song.id.absoluteString) }
+    }
+
+    private func exclude(_ songs: [Song]) {
+        for song in songs { excluded.insert(song.id.absoluteString) }
+    }
 
     private var includedSongs: [Song] {
         scannedSongs.filter { !excluded.contains($0.id.absoluteString) }
@@ -67,8 +100,11 @@ struct PlaylistCreateSheet: View {
                     folderSection
                     if pickedFolder != nil {
                         identitySection
-                        songsSection
+                        // Cards before the song list: the list runs to hundreds
+                        // of rows, and burying the card settings under it means
+                        // scrolling the whole library to change a number.
                         cardsSection
+                        songsSection
                     }
                     if let createError {
                         Text(createError)
@@ -167,19 +203,45 @@ struct PlaylistCreateSheet: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         Spacer()
-                        Button("Include All") {
-                            excluded.removeAll()
+                        // While filtering, these act on what's shown — clearing
+                        // hidden songs after a search would be a nasty surprise.
+                        Button(isSearching ? "Include Shown" : "Include All") {
+                            include(visibleSongs)
                         }
                         .controlSize(.small)
-                        Button("Exclude All") {
-                            excluded = Set(scannedSongs.map { $0.id.absoluteString })
+                        Button(isSearching ? "Exclude Shown" : "Exclude All") {
+                            exclude(visibleSongs)
                         }
                         .controlSize(.small)
                     }
 
+                    HStack(spacing: 6) {
+                        Image(systemName: "magnifyingglass")
+                            .foregroundStyle(.secondary)
+                        TextField("Search these songs", text: $songSearch)
+                            .textFieldStyle(.plain)
+                        if !songSearch.isEmpty {
+                            Button {
+                                songSearch = ""
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundStyle(.tertiary)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(6)
+                    .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 6))
+
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 4) {
-                            ForEach(scannedSongs) { song in
+                            if visibleSongs.isEmpty {
+                                Text("No songs match “\(songSearch)”.")
+                                    .foregroundStyle(.secondary)
+                                    .font(.callout)
+                                    .padding(8)
+                            }
+                            ForEach(visibleSongs) { song in
                                 songRow(song)
                             }
                         }
@@ -251,8 +313,29 @@ struct PlaylistCreateSheet: View {
     private var cardsSection: some View {
         GroupBox("Cards") {
             VStack(alignment: .leading, spacing: 8) {
-                Stepper("Number of Cards: \(numberOfCards)", value: $numberOfCards, in: 1...200)
+                HStack(spacing: 10) {
+                    Text("Number of Cards")
+                    // Typing beats holding a stepper when a venue wants 100.
+                    // String-backed so non-digits are filtered rather than
+                    // silently reverted on commit.
+                    TextField("10", text: $cardCountText)
+                        .multilineTextAlignment(.trailing)
+                        .frame(width: 70)
+                        .onSubmit { clampCardCount() }
+                    Stepper("Number of Cards", value: $numberOfCards, in: Self.cardRange)
+                        .labelsHidden()
+                    Spacer()
+                }
                 Toggle("Free Space (center)", isOn: $hasFreeSpace)
+            }
+            .onAppear { cardCountText = String(numberOfCards) }
+            .onChange(of: cardCountText) { _, newValue in
+                let digits = String(newValue.filter(\.isNumber).prefix(3))
+                if digits != newValue { cardCountText = digits }
+                if let value = Int(digits) { numberOfCards = value }
+            }
+            .onChange(of: numberOfCards) { _, newValue in
+                if Int(cardCountText) != newValue { cardCountText = String(newValue) }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(8)

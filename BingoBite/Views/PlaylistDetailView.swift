@@ -34,7 +34,7 @@ struct PlaylistDetailView: View {
     }
 
     private var soundByteLookup: [String: SoundByte] {
-        Dictionary(uniqueKeysWithValues: allSoundBytes.map { ($0.songURLString, $0) })
+        Dictionary(uniqueKeysWithValues: allSoundBytes.map { ($0.songKey, $0) })
     }
 
     private var displayedSongs: [Song] {
@@ -46,9 +46,9 @@ struct PlaylistDetailView: View {
         return filtered.sorted(using: sortOrder)
     }
 
-    /// All songs found in the source folder that are NOT already in the playlist's songURLStrings.
+    /// All songs found in the source folder that are NOT already in the playlist's songKeys.
     private var availableReplacementSongs: [Song] {
-        let usedURLs = Set(playlist.songURLStrings)
+        let usedURLs = Set(playlist.songKeys)
         return allScannedSongs.filter { !usedURLs.contains($0.id.absoluteString) }
     }
 
@@ -327,21 +327,21 @@ struct PlaylistDetailView: View {
             }
             .width(ideal: 70)
             TableColumn("Start") { (song: Song) in
-                let sb = soundByteLookup[song.id.absoluteString]
+                let sb = soundByteLookup[song.stableKey]
                 Text(sb != nil ? Self.formatTime(sb!.startTime) : "--:--")
                     .monospacedDigit()
                     .foregroundStyle(sb != nil ? .primary : .tertiary)
             }
             .width(ideal: 60)
             TableColumn("Stop") { (song: Song) in
-                let sb = soundByteLookup[song.id.absoluteString]
+                let sb = soundByteLookup[song.stableKey]
                 Text(sb != nil ? Self.formatTime(sb!.endTime) : "--:--")
                     .monospacedDigit()
                     .foregroundStyle(sb != nil ? .primary : .tertiary)
             }
             .width(ideal: 60)
             TableColumn("Clip") { (song: Song) in
-                let sb = soundByteLookup[song.id.absoluteString]
+                let sb = soundByteLookup[song.stableKey]
                 Text(sb != nil ? Self.formatTime(sb!.clipDuration) : "--:--")
                     .monospacedDigit()
                     .foregroundStyle(sb != nil ? .primary : .tertiary)
@@ -422,7 +422,7 @@ struct PlaylistDetailView: View {
     private func applyMetadataOverrides() {
         let overrides = SongMetadataService.fetchAll(in: modelContext)
         for i in songs.indices {
-            if let override = overrides[songs[i].id.absoluteString] {
+            if let override = overrides[songs[i].stableKey] {
                 songs[i] = songs[i].applying(override: override)
             }
         }

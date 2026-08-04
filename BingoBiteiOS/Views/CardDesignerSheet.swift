@@ -16,11 +16,15 @@ struct CardDesignerSheet: View {
     @State private var exportedPDF: URL?
     @State private var showShareSheet = false
     @State private var isExporting = false
+    /// Edited here rather than read straight off the playlist so a cancelled
+    /// edit doesn't leave a half-typed code on the model.
+    @State private var setID: String
 
     init(playlist: Playlist, songs: [Song]) {
         self.playlist = playlist
         self.songs = songs
         _settings = State(initialValue: CardDesignSettings.decode(from: playlist.cardDesignData))
+        _setID = State(initialValue: playlist.setID)
     }
 
     private var cards: [BingoCard] {
@@ -30,17 +34,22 @@ struct CardDesignerSheet: View {
     var body: some View {
         NavigationStack {
             HStack(spacing: 0) {
-                CardDesignControlsView(settings: $settings, selectedOverlayID: $selectedOverlayID)
-                    .frame(width: 380)
+                CardDesignControlsView(
+                    settings: $settings,
+                    selectedOverlayID: $selectedOverlayID,
+                    setID: $setID
+                )
+                .frame(width: 380)
 
                 Divider()
 
                 CardDesignPreviewView(
                     cards: cards,
                     songs: songs,
-                    songURLStrings: playlist.songURLStrings,
+                    songKeys: playlist.songKeys,
                     settings: $settings,
-                    selectedOverlayID: $selectedOverlayID
+                    selectedOverlayID: $selectedOverlayID,
+                    setID: setID
                 )
                 .frame(maxWidth: .infinity)
             }
@@ -94,6 +103,9 @@ struct CardDesignerSheet: View {
 
     private func save() {
         playlist.cardDesignData = settings.encode()
+        playlist.setID = setID
+            .uppercased()
+            .filter { $0.isLetter || $0.isNumber }
         try? modelContext.save()
     }
 
@@ -108,8 +120,9 @@ struct CardDesignerSheet: View {
             guard let url = CardExportService.writeTemporaryPDF(
                 cards: cards,
                 songs: songs,
-                songURLStrings: playlist.songURLStrings,
+                songKeys: playlist.songKeys,
                 settings: settings,
+                setID: playlist.setID,
                 defaultName: playlist.name
             ) else { return }
 
@@ -132,9 +145,11 @@ struct CardDesignerSheet: View {
 struct CardDesignPreviewView: View {
     var cards: [BingoCard]
     var songs: [Song]
-    var songURLStrings: [String]
+    var songKeys: [String]
     @Binding var settings: CardDesignSettings
     @Binding var selectedOverlayID: String?
+    /// The deck's set code, printed alongside each card number.
+    var setID: String = ""
 
     @State private var selectedCardIndex = 0
     @State private var dragOffset: CGSize = .zero
@@ -179,34 +194,77 @@ struct CardDesignPreviewView: View {
         }
     }
 
+    /// The printed sheet, laid out by the same geometry the PDF exporter uses,
+    /// so what's on screen is what comes out of the printer.
+    ///
+    /// Cards after the first are filled with the following cards in the deck,
+    /// which is what actually gets printed on that sheet.
     private var page: some View {
-        ZStack {
-            Color.white
+        GeometryReader { geo in
+            ZStack(alignment: .topLeading) {
+                Color.white
 
+                ForEach(0..<max(settings.cardsPerPage, 1), id: \.self) { slot in
+                    let rect = settings.cardRect(forSlot: slot, scaledTo: geo.size)
+                    cardSlot(slot: slot, canvas: rect.size)
+                        .frame(width: rect.width, height: rect.height)
+                        .offset(x: rect.minX, y: rect.minY)
+                }
+            }
+        }
+        .aspectRatio(settings.pageAspectRatio, contentMode: .fit)
+        .frame(maxWidth: pageWidth)
+        .animation(.easeInOut(duration: 0.2), value: settings.pageOrientation)
+        .animation(.easeInOut(duration: 0.2), value: settings.cardsPerPage)
+        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .shadow(color: .black.opacity(0.18), radius: 12, y: 6)
+    }
+
+    /// One card on the sheet. The slot shows the card that would actually be
+    /// printed there — the selected card first, then the ones following it.
+    ///
+    /// Overlays are only draggable on the first slot; the rest are there to
+    /// show the arrangement, and having four live drag targets for the same
+    /// overlay would be ambiguous.
+    @ViewBuilder
+    private func cardSlot(slot: Int, canvas: CGSize) -> some View {
+        let cardIndex = (selectedCardIndex + slot) % max(cards.count, 1)
+
+        if cards.indices.contains(cardIndex) {
             ZStack {
+                // Composed at the exporter's reference width and scaled down,
+                // rather than laid out directly into a small frame. Font sizes
+                // are absolute points, so composing straight into a 4-up slot
+                // collapses the grid.
                 CardWithOverlaysView(
-                    card: cards[selectedCardIndex],
+                    card: cards[cardIndex],
                     songs: songs,
-                    songURLStrings: songURLStrings,
-                    settings: settings
+                    songKeys: songKeys,
+                    settings: settings,
+                    setID: setID
                 )
+                .frame(
+                    width: CardDesignSettings.cardReferenceSize.width,
+                    height: CardDesignSettings.cardReferenceSize.height
+                )
+                .scaleEffect(
+                    canvas.width / CardDesignSettings.cardReferenceWidth,
+                    anchor: .center
+                )
+                .frame(width: canvas.width, height: canvas.height)
+                .clipped()
 
-                GeometryReader { geo in
+                if slot == 0 {
                     Color.clear
                         .contentShape(Rectangle())
                         .onTapGesture { selectedOverlayID = nil }
 
                     ForEach(Array(settings.imageOverlays.enumerated()), id: \.element.id) { index, overlay in
-                        overlayHandle(index: index, overlay: overlay, canvas: geo.size)
+                        overlayHandle(index: index, overlay: overlay, canvas: canvas)
                     }
                 }
             }
-            .padding(pageMarginFraction * pageWidth)
         }
-        .aspectRatio(8.5 / 11.0, contentMode: .fit)
-        .frame(maxWidth: pageWidth)
-        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-        .shadow(color: .black.opacity(0.18), radius: 12, y: 6)
     }
 
     /// Invisible drag target sitting over each overlay in the preview.

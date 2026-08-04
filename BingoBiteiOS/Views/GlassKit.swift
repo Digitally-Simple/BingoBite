@@ -17,9 +17,12 @@ enum Glassware {
     static let tileCorner: CGFloat = 16
     static let deckCorner: CGFloat = 30
 
-    /// Floating material — transparent, never frosted.
+    /// Floating material — transparent, never frosted. `interactive()` opts
+    /// into the system's own liquid touch response, so the glass reacts to
+    /// fingers as a material characteristic rather than anything we animate.
     static func floating(tint: Color? = nil) -> Glass {
-        tint.map { Glass.clear.tint($0.opacity(0.45)) } ?? Glass.clear
+        let base = tint.map { Glass.clear.tint($0.opacity(0.45)) } ?? Glass.clear
+        return base.interactive()
     }
 }
 

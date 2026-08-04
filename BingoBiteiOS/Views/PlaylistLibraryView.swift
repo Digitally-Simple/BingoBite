@@ -9,9 +9,48 @@ struct PlaylistLibraryView: View {
 
     @State private var searchText = ""
     @State private var showCreateSheet = false
+    @State private var showPasteSheet = false
     @State private var pendingDeletion: Playlist?
+    @State private var duplicateError: String?
+
+    private func duplicate(_ playlist: Playlist) {
+        do {
+            let copy = try PlaylistService.duplicate(
+                playlist,
+                name: "\(playlist.name) copy",
+                in: modelContext
+            )
+            onOpen(copy.persistentModelID)
+        } catch {
+            duplicateError = error.localizedDescription
+        }
+    }
 
     private let columns = [GridItem(.adaptive(minimum: 220, maximum: 300), spacing: 20)]
+
+    /// Split out of `body` — inline, the nested Menu pushes the toolbar
+    /// expression past what the type-checker will attempt.
+    @ViewBuilder
+    private var newPlaylistMenu: some View {
+        Menu {
+            Button("From Songs or a Folder…", systemImage: "plus") {
+                showCreateSheet = true
+            }
+            Button("Paste a Song List…", systemImage: "doc.on.clipboard") {
+                showPasteSheet = true
+            }
+            if !playlists.isEmpty {
+                Divider()
+                Menu("Duplicate", systemImage: "plus.square.on.square") {
+                    ForEach(playlists) { playlist in
+                        Button(playlist.name) { duplicate(playlist) }
+                    }
+                }
+            }
+        } label: {
+            Label("New Playlist", systemImage: "plus")
+        }
+    }
 
     private var filtered: [Playlist] {
         guard !searchText.isEmpty else { return playlists }
@@ -35,16 +74,25 @@ struct PlaylistLibraryView: View {
         .navigationBarTitleDisplayMode(.large)
         .searchable(text: $searchText, prompt: "Search playlists")
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button("New Playlist", systemImage: "plus") {
-                    showCreateSheet = true
-                }
-            }
+            ToolbarItem(placement: .topBarTrailing) { newPlaylistMenu }
         }
         .sheet(isPresented: $showCreateSheet) {
             PlaylistCreateSheet { playlist in
                 onOpen(playlist.persistentModelID)
             }
+        }
+        .sheet(isPresented: $showPasteSheet) {
+            PastePlaylistSheet(libraryURL: SongsFolderService.libraryURL) { playlist in
+                onOpen(playlist.persistentModelID)
+            }
+        }
+        .alert("Couldn't duplicate", isPresented: Binding(
+            get: { duplicateError != nil },
+            set: { if !$0 { duplicateError = nil } }
+        )) {
+            Button("OK") { duplicateError = nil }
+        } message: {
+            if let duplicateError { Text(duplicateError) }
         }
         .confirmationDialog(
             "Delete “\(pendingDeletion?.name ?? "")”?",

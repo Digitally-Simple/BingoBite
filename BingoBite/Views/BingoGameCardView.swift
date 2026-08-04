@@ -3,7 +3,7 @@ import SwiftUI
 struct BingoGameCardView: View {
     var card: BingoCard
     var scoredMatrix: [[BingoGameService.CellState]]
-    var songURLStrings: [String]
+    var songKeys: [String]
     var shuffledSongs: [String]
     var currentIndex: Int
     var songLookup: [String: Song]
@@ -15,8 +15,8 @@ struct BingoGameCardView: View {
     /// Maps a 1-based song index (from the card grid) to its 1-based position
     /// in the shuffled play order.
     private func shuffledNumber(for songIndex: Int) -> Int? {
-        guard songIndex > 0, songIndex <= songURLStrings.count else { return nil }
-        let url = songURLStrings[songIndex - 1]
+        guard songIndex > 0, songIndex <= songKeys.count else { return nil }
+        let url = songKeys[songIndex - 1]
         guard let pos = shuffledSongs.firstIndex(of: url) else { return nil }
         return pos + 1
     }
@@ -107,7 +107,7 @@ struct BingoGameCardView: View {
             if value != 0 {
                 BingoCellPopoverView(
                     songIndex: value,
-                    songURLStrings: songURLStrings,
+                    songKeys: songKeys,
                     shuffledSongs: shuffledSongs,
                     currentIndex: currentIndex,
                     songLookup: songLookup
@@ -129,14 +129,14 @@ struct BingoGameCardView: View {
 
 struct BingoCellPopoverView: View {
     var songIndex: Int
-    var songURLStrings: [String]
+    var songKeys: [String]
     var shuffledSongs: [String]
     var currentIndex: Int
     var songLookup: [String: Song]
 
     private var songURL: String? {
-        guard songIndex > 0, songIndex <= songURLStrings.count else { return nil }
-        return songURLStrings[songIndex - 1]
+        guard songIndex > 0, songIndex <= songKeys.count else { return nil }
+        return songKeys[songIndex - 1]
     }
 
     private var song: Song? {

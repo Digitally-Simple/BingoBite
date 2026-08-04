@@ -5,6 +5,7 @@ import UniformTypeIdentifiers
 struct CardDesignControlsView: View {
     @Binding var settings: CardDesignSettings
     @Binding var selectedOverlayID: String?
+    @Binding var setID: String
 
     private var availableFonts: [String] {
         ["System"] + NSFontManager.shared.availableFontFamilies.sorted()
@@ -18,6 +19,7 @@ struct CardDesignControlsView: View {
                 colorsSection
                 cardTitleSection
                 cardNumberSection
+                setIdentitySection
                 freeSpaceSection
                 pageLayoutSection
                 imageOverlaysSection
@@ -169,6 +171,52 @@ struct CardDesignControlsView: View {
         }
     }
 
+    // MARK: - Card Set
+
+    /// Identifies a printed deck so cards from different decks can be sorted
+    /// back apart after they get shuffled together.
+    private var setIdentitySection: some View {
+        GroupBox("Card Set") {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("Set Code")
+                    Spacer()
+                    TextField("AB", text: $setID)
+                        .textFieldStyle(.roundedBorder)
+                        .multilineTextAlignment(.trailing)
+                        .frame(width: 90)
+                        .onChange(of: setID) { _, newValue in
+                            // Codes get read off paper and typed back in, so
+                            // keep them short and unambiguous.
+                            let cleaned = String(
+                                newValue.uppercased().filter { $0.isLetter || $0.isNumber }.prefix(4)
+                            )
+                            if cleaned != newValue { setID = cleaned }
+                        }
+                }
+
+                Toggle("Print Set Code on Cards", isOn: $settings.showSetID)
+                    .disabled(!settings.showCardNumbers || setID.isEmpty)
+
+                Text(setIDSummary)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.vertical, 4)
+        }
+    }
+
+    private var setIDSummary: String {
+        guard settings.showCardNumbers else {
+            return "Card numbers are off, so nothing prints in the corner of each card."
+        }
+        guard settings.showSetID, !setID.isEmpty else {
+            return "Cards print as “Card #1”. Turn on the set code to print “\(setID.isEmpty ? "AB" : setID)-1” instead, so decks shuffled together can be sorted apart."
+        }
+        return "Cards print as “\(setID)-1”, “\(setID)-2”… Give each deck its own code so they can be told apart once mixed."
+    }
+
     // MARK: - Free Space
 
     private var freeSpaceSection: some View {
@@ -186,20 +234,39 @@ struct CardDesignControlsView: View {
     // MARK: - Page Layout
 
     private var pageLayoutSection: some View {
-        GroupBox("Page Layout") {
+        GroupBox("Printing") {
             VStack(alignment: .leading, spacing: 8) {
-                Picker("Cards Per Page", selection: $settings.cardsPerPage) {
+                Picker("Cards Per Sheet", selection: $settings.cardsPerPage) {
                     Text("1").tag(1)
                     Text("2").tag(2)
                     Text("4").tag(4)
                 }
 
-                Picker("Orientation", selection: $settings.pageOrientation) {
+                Picker("Paper Orientation", selection: $settings.pageOrientation) {
                     Text("Portrait").tag("portrait")
                     Text("Landscape").tag("landscape")
                 }
+
+                Text("How cards sit on a sheet of US Letter paper. \(printingSummary)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .padding(.vertical, 4)
+        }
+    }
+
+    /// Spells out the resulting arrangement, since "2 per sheet" means side by
+    /// side on landscape and stacked on portrait.
+    private var printingSummary: String {
+        let grid = settings.grid
+        let shape = settings.isLandscape ? "wider than they are tall" : "taller than they are wide"
+        switch settings.cardsPerPage {
+        case 1:  return "One card fills each sheet, \(shape)."
+        case 2:  return grid.columns == 2
+            ? "Two cards side by side, each \(shape)."
+            : "Two cards stacked, each \(shape)."
+        default: return "Four cards in a 2×2 grid, each \(shape)."
         }
     }
 
