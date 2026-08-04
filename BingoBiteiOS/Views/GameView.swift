@@ -39,6 +39,9 @@ struct GameView: View {
     /// plays out, the gap passes, the next round starts. Lives with the game
     /// screen rather than the app, so leaving the screen ends the run.
     @StateObject private var autoplay = AutoplayEngine()
+    /// The passing "that's on now" card, for toggles whose effect isn't
+    /// audible until the next round.
+    @State private var notice: StatusNotice?
 
     /// A round whose song can't be played. Surfaced as a banner rather than a
     /// silent skip, because mid-game the host needs to know why nothing
@@ -113,6 +116,7 @@ struct GameView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
                     shuffleIncludesPreviouslyPlayed.toggle()
+                    notice = .playedRounds(isLocked: !shuffleIncludesPreviouslyPlayed)
                 } label: {
                     Image(systemName: shuffleIncludesPreviouslyPlayed ? "lock.open.fill" : "lock.fill")
                 }
@@ -183,6 +187,7 @@ struct GameView: View {
                 gameDeck
             }
         )
+        .statusNotice($notice)
         .task(id: game.playlistUUID) { await loadSongs() }
         .onAppear { updateSkipHandlers() }
         .onAppear { BingoGameService.recordCurrentProgress(game, in: modelContext) }
@@ -363,6 +368,10 @@ struct GameView: View {
     /// of the way when something is — it never cuts a song already playing.
     private func toggleAutoplay() {
         autoplay.isEnabled.toggle()
+        notice = .autoplay(
+            isOn: autoplay.isEnabled,
+            gap: AppSettingsService.autoplayGap(in: modelContext)
+        )
         guard autoplay.isEnabled, !audioPlayer.isPlaying else { return }
 
         if audioPlayer.currentSong == nil {
