@@ -1,37 +1,23 @@
 import SwiftUI
 
-/// What the round is doing, right now, in two rows.
+/// What the round is doing, right now.
 ///
-/// The top row is the segment itself: the fade curve the player is riding,
-/// drawn against the trimmed window, with a playhead crossing it and one line
-/// saying what happens next. The bottom row is the fader, which doubles as the
-/// meter — the fill *is* the level coming out, so during a fade it moves on its
-/// own and the host can see the room being taken down before they hear it.
-///
-/// Deliberately two rows and no more. A host glancing down mid-round is reading
-/// this from arm's length while someone shouts about a bingo.
+/// The fade curve the player is riding, drawn against the trimmed window, with
+/// a playhead crossing it and one line saying what happens next. Deliberately
+/// two rows and no more: a host glancing down mid-round is reading this from
+/// arm's length while someone shouts about a bingo.
 struct SegmentMonitor: View {
     @ObservedObject var audioPlayer: AudioPlayerService
-    /// Called when the fader is let go, so the level can be saved without
-    /// writing to the store on every frame of the drag.
-    var onVolumeCommit: () -> Void
 
     private var timing: AudioPlayerService.SegmentTiming? { audioPlayer.segmentTiming }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            if let timing {
+        if let timing {
+            VStack(alignment: .leading, spacing: 8) {
                 SegmentTimeline(timing: timing, envelope: audioPlayer.fadeEnvelope)
                     .frame(height: 40)
                 transitionLine(timing)
             }
-
-            LevelFader(
-                volume: $audioPlayer.masterVolume,
-                level: audioPlayer.outputLevel,
-                isLive: audioPlayer.isPlaying,
-                onCommit: onVolumeCommit
-            )
         }
     }
 
@@ -169,18 +155,28 @@ private struct SegmentTimeline: View {
 
 // MARK: - Fader
 
-/// The master level, as a control and a meter at once.
+/// The master level, as a Control Center–style column that is also the meter.
 ///
-/// The bright fill is the *output* — the fader scaled by wherever the envelope
-/// is — so it dips during a fade without the handle moving. The handle is where
-/// the host put it. Dragging anywhere on the track moves it.
-private struct LevelFader: View {
+/// Two fills, and the difference between them is the whole point. The soft one
+/// is the fader — where the host set the ceiling, and the only thing dragging
+/// moves. The bright one is the signal: how loud the music actually is right
+/// now, metered off the player and scaled by the gain going out, so it bumps
+/// with the track and sinks away through a fade while the fader stays put.
+///
+/// Observes `AudioLevelMeter` rather than the player, so twenty-four updates a
+/// second redraw this column and nothing else on the screen.
+struct VerticalLevelFader: View {
     @Binding var volume: Double
-    var level: Double
-    var isLive: Bool
+    @ObservedObject var levels: AudioLevelMeter
+    /// Called when the drag ends, so the level can be saved without writing to
+    /// the store on every frame.
     var onCommit: () -> Void
 
     @State private var isDragging = false
+    /// Where the fader was when the finger went down. The drag is relative to
+    /// it — an absolute one would snap the level to wherever you happened to
+    /// touch, which on a live PA is a jump scare.
+    @State private var dragStartVolume: Double = 0
 
     private var symbol: String {
         if volume <= 0.001 { return "speaker.slash.fill" }
@@ -190,20 +186,13 @@ private struct LevelFader: View {
     }
 
     var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: symbol)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .frame(width: 20, alignment: .leading)
-                .contentTransition(.symbolEffect(.replace))
-
-            track
-
+        VStack(spacing: 8) {
             Text("\(Int((volume * 100).rounded()))%")
-                .font(.caption2.weight(.medium))
+                .font(.caption2.weight(.semibold))
                 .monospacedDigit()
                 .foregroundStyle(.secondary)
-                .frame(width: 38, alignment: .trailing)
+
+            column
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Volume")
@@ -214,49 +203,59 @@ private struct LevelFader: View {
         }
     }
 
-    private var track: some View {
+    private var column: some View {
         GeometryReader { geo in
-            let width = max(geo.size.width, 1)
-            let height: CGFloat = isDragging ? 12 : 8
+            let height = max(geo.size.height, 1)
+            let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
 
-            ZStack(alignment: .leading) {
-                Capsule()
-                    .fill(.quaternary)
-                    .frame(height: height)
+            ZStack(alignment: .bottom) {
+                shape.fill(.quaternary.opacity(0.55))
 
-                // Where the fader sits — the ceiling the meter fills up to.
-                Capsule()
-                    .fill(.tint.opacity(0.28))
-                    .frame(width: width * volume, height: height)
+                // The fader: the ceiling, and what the drag moves.
+                Rectangle()
+                    .fill(.tint.opacity(0.32))
+                    .frame(height: height * volume)
 
-                // What's actually coming out.
-                Capsule()
+                // The signal: what's actually coming out, bumping with the
+                // track. Never taller than the fill above it, because it's
+                // already been scaled by the gain.
+                Rectangle()
                     .fill(.tint)
-                    .frame(width: width * min(level, 1), height: height)
-                    .opacity(isLive ? 1 : 0.45)
-                    .animation(.linear(duration: 1.0 / 24.0), value: level)
+                    .frame(height: height * levels.signal)
+                    .animation(.linear(duration: 1.0 / 24.0), value: levels.signal)
 
-                Circle()
-                    .fill(.white)
-                    .frame(width: isDragging ? 18 : 14, height: isDragging ? 18 : 14)
-                    .shadow(color: .black.opacity(0.35), radius: 3, y: 1)
-                    .offset(x: width * volume - (isDragging ? 9 : 7))
+                Image(systemName: symbol)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .shadow(color: .black.opacity(0.4), radius: 2)
+                    .padding(.bottom, 14)
+                    .contentTransition(.symbolEffect(.replace))
             }
-            .frame(maxHeight: .infinity)
-            .contentShape(Rectangle())
-            .gesture(
+            .clipShape(shape)
+            .contentShape(shape)
+            // High priority, because the expanded deck collapses on a downward
+            // swipe — and pulling a fader *down* is half of what a fader is
+            // for. Without this, turning the room down shuts the panel.
+            .highPriorityGesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { value in
-                        isDragging = true
-                        volume = min(max(value.location.x / width, 0), 1)
+                        if !isDragging {
+                            isDragging = true
+                            dragStartVolume = volume
+                        }
+                        // Up is louder: translation goes positive downward.
+                        volume = min(max(dragStartVolume - value.translation.height / height, 0), 1)
                     }
                     .onEnded { _ in
                         isDragging = false
                         onCommit()
                     }
             )
-            .animation(.smooth(duration: 0.18), value: isDragging)
+            // Control Center swells the column while it's being held; the
+            // width is what gives, so the level it's showing doesn't move.
+            .scaleEffect(x: isDragging ? 1.08 : 1, y: 1)
+            .animation(.smooth(duration: 0.2), value: isDragging)
         }
-        .frame(height: 22)
+        .frame(width: 56)
     }
 }

@@ -38,6 +38,7 @@ final class AudioPlayerService: ObservableObject {
     private var clipStartTime: TimeInterval = 0
     private var clipEndTime: TimeInterval?
     private var fadeTimer: Timer?
+    private var meterTimer: Timer?
     private var manualFade: ManualFade?
 
     /// Volume shape applied while playing. Set from settings by whoever owns
@@ -65,9 +66,9 @@ final class AudioPlayerService: ObservableObject {
     /// The fader, guaranteed to be in range whatever a caller stored.
     private var clampedMasterVolume: Double { min(max(masterVolume, 0), 1) }
 
-    /// What's actually coming out right now, 0...1 — the fader times the
-    /// envelope at the playhead. This is the number a meter should draw.
-    @Published private(set) var outputLevel: Double = 1
+    /// The live level, on its own publisher so a fade doesn't redraw the room.
+    /// See `AudioLevelMeter`.
+    let levels = AudioLevelMeter()
 
     var progress: Double {
         guard duration > 0 else { return 0 }
@@ -236,9 +237,10 @@ final class AudioPlayerService: ObservableObject {
         clipEndTime = nil
         currentTime = 0
         duration = 0
-        // Nothing is coming out, so the meter rests at where the fader is
-        // rather than holding the last fade's dying level.
-        outputLevel = clampedMasterVolume
+        // Nothing is coming out, so the fader shows where it's set and the
+        // signal meter drops rather than holding the last sample it saw.
+        levels.set(output: clampedMasterVolume)
+        levels.reset()
         clearNowPlayingInfo()
     }
 
@@ -482,12 +484,15 @@ final class AudioPlayerService: ObservableObject {
             }
         }
         startFadeTimer()
+        startMeterTimer()
     }
 
     private func stopTimer() {
         timer?.invalidate()
         timer = nil
         stopFadeTimer()
+        stopMeterTimer()
+        levels.reset()
     }
 
     // MARK: - Fade envelope
@@ -570,26 +575,53 @@ final class AudioPlayerService: ObservableObject {
     /// disagree with what's actually coming out.
     private func setOutput(level: Double) {
         let level = min(max(level, 0), 1)
+        currentOutputGain = level
         player?.volume = Float(level)
-        publish(level: level)
+        levels.set(output: level)
     }
 
-    /// The fade ticker runs at 60Hz. Republishing at that rate would redraw
-    /// every view watching the player sixty times a second for a bar a few
-    /// points tall, so the meter gets a slower, still-smooth feed.
-    private static let levelPublishInterval: TimeInterval = 1.0 / 24.0
-    private var lastLevelPublish = Date.distantPast
+    /// The gain last written to the player, kept so the signal meter can scale
+    /// by it. `AVAudioPlayer`'s metering reads the decoded audio, which doesn't
+    /// know the volume property exists — without this the bar would sit at full
+    /// height through a fade-out the room can hear disappearing.
+    private var currentOutputGain: Double = 1
 
-    private func publish(level: Double) {
-        let now = Date()
-        guard abs(level - outputLevel) > 0.002 else { return }
-        // Big jumps — a new song, the fader being dragged — land immediately;
-        // the gradual crawl of a fade is what gets rate-limited.
-        guard abs(level - outputLevel) > 0.05
-            || now.timeIntervalSince(lastLevelPublish) >= Self.levelPublishInterval else { return }
-        lastLevelPublish = now
-        outputLevel = level
+    // MARK: - Signal metering
+
+    /// Fast enough to look alive, slow enough that a phone-sized view isn't
+    /// redrawing on every display frame for a bar a few points wide.
+    private static let meterTickInterval: TimeInterval = 1.0 / 24.0
+
+    private func startMeterTimer() {
+        stopMeterTimer()
+        player?.isMeteringEnabled = true
+        meterTimer = Timer.scheduledTimer(withTimeInterval: Self.meterTickInterval, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.tickMeter()
+            }
+        }
     }
+
+    private func stopMeterTimer() {
+        meterTimer?.invalidate()
+        meterTimer = nil
+    }
+
+    private func tickMeter() {
+        guard let player, player.isPlaying else {
+            levels.silence()
+            return
+        }
+        player.updateMeters()
+        // The loudest channel, so a track mixed hard to one side still reads.
+        let channels = max(player.numberOfChannels, 1)
+        let peak = (0..<channels)
+            .map { Double(player.averagePower(forChannel: $0)) }
+            .max() ?? Double(Self.silentDecibels)
+        levels.feed(decibels: peak, gain: currentOutputGain)
+    }
+
+    private static let silentDecibels: Float = -160
 
     private func startFadeTimer() {
         guard fadeEnvelope.isActive else {

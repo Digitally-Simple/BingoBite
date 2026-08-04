@@ -542,10 +542,14 @@ struct NowPlayingDeck: View {
 /// and a metadata column beside it carrying every control the row gave up.
 /// Collapses via the chevron, a downward swipe, or the grab gesture. The
 /// playhead isn't here — it's the row, directly underneath.
-private struct DeckExpandedShell<Details: View>: View {
+private struct DeckExpandedShell<Details: View, Trailing: View>: View {
     var artwork: Data?
     var onCollapse: () -> Void
     @ViewBuilder var details: Details
+    /// Sits beside the details column and *outside* the swipe-to-collapse
+    /// gesture. Anything here owns its own vertical drags — a fader pulled
+    /// down would otherwise shut the panel on its way past 60 points.
+    @ViewBuilder var trailing: Trailing
 
     var body: some View {
         VStack(spacing: 16) {
@@ -560,28 +564,48 @@ private struct DeckExpandedShell<Details: View>: View {
             .buttonStyle(.plain)
             .accessibilityLabel("Collapse player")
 
-            HStack(alignment: .center, spacing: 26) {
-                ArtworkView(data: artwork, corner: 20)
-                    .frame(width: 210, height: 210)
-                    .shadow(color: .black.opacity(0.35), radius: 20, y: 12)
+            HStack(alignment: .top, spacing: 18) {
+                HStack(alignment: .center, spacing: 26) {
+                    ArtworkView(data: artwork, corner: 20)
+                        .frame(width: 210, height: 210)
+                        .shadow(color: .black.opacity(0.35), radius: 20, y: 12)
 
-                details
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    details
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                // The width cap belongs to the artwork and details, not to the
+                // row: a trailing column added on top of a capped row overflows
+                // it and gets clipped by the deck's own rounded edge.
+                .frame(maxWidth: 560)
+                // Swipe down over the artwork or the details to collapse. A
+                // child's own gesture doesn't suppress an ancestor's, so the
+                // gesture is scoped by *where it's attached* rather than by
+                // priority — which is why the trailing slot exists.
+                .contentShape(Rectangle())
+                .gesture(
+                    DragGesture(minimumDistance: 20)
+                        .onEnded { value in
+                            if value.translation.height > 60 { onCollapse() }
+                        }
+                )
+
+                trailing
             }
-            .frame(maxWidth: 560)
         }
         .padding(.top, 12)
         .padding(.horizontal, 26)
         .padding(.bottom, 8)
         .frame(maxWidth: .infinity)
-        // Swipe down anywhere in the expanded area to collapse. The scrubber
-        // lives in the row below this, so its drag never fights this one.
-        .gesture(
-            DragGesture(minimumDistance: 20)
-                .onEnded { value in
-                    if value.translation.height > 60 { onCollapse() }
-                }
-        )
+    }
+}
+
+extension DeckExpandedShell where Trailing == EmptyView {
+    init(
+        artwork: Data?,
+        onCollapse: @escaping () -> Void,
+        @ViewBuilder details: () -> Details
+    ) {
+        self.init(artwork: artwork, onCollapse: onCollapse, details: details, trailing: { EmptyView() })
     }
 }
 
@@ -686,7 +710,25 @@ private struct GameDeckExpandedContent: View {
     private var isPlaying: Bool { audioPlayer.isPlaying }
 
     var body: some View {
+        // The fader is a column down the right-hand edge, so it reads as an
+        // instrument sitting beside the round rather than another control
+        // stacked under the transport — and it goes in the trailing slot, out
+        // of reach of the deck's swipe-to-collapse.
         DeckExpandedShell(artwork: song?.artworkData, onCollapse: onCollapse) {
+            details
+        } trailing: {
+            if !isCompleted, song != nil {
+                VerticalLevelFader(
+                    volume: $audioPlayer.masterVolume,
+                    levels: audioPlayer.levels,
+                    onCommit: onVolumeCommit
+                )
+                .frame(height: 190)
+            }
+        }
+    }
+
+    private var details: some View {
             VStack(alignment: .leading, spacing: 5) {
                 Text(roundLabel)
                     .font(.caption.weight(.semibold))
@@ -741,12 +783,11 @@ private struct GameDeckExpandedContent: View {
                     .padding(.top, 12)
 
                     if song != nil {
-                        SegmentMonitor(audioPlayer: audioPlayer, onVolumeCommit: onVolumeCommit)
+                        SegmentMonitor(audioPlayer: audioPlayer)
                             .padding(.top, 14)
                     }
                 }
             }
-        }
     }
 }
 
