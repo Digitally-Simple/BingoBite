@@ -32,6 +32,19 @@ enum AppSettingsService {
         current(in: context).autoplayGap
     }
 
+    /// Where the fader was left, clamped in case an old row holds something odd.
+    static func playbackVolume(in context: ModelContext) -> Double {
+        min(max(current(in: context).playbackVolume, 0), 1)
+    }
+
+    /// Written when the host lets go of the fader rather than on every frame
+    /// of the drag — a save per tick would hit the store sixty times a second.
+    static func setPlaybackVolume(_ value: Double, in context: ModelContext) {
+        let settings = current(in: context)
+        settings.playbackVolume = min(max(value, 0), 1)
+        save(in: context)
+    }
+
     static func save(in context: ModelContext) {
         try? context.save()
     }

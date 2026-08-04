@@ -115,11 +115,12 @@ struct RootView: View {
         inspectorSong = song
     }
 
-    /// Pushes the saved fade settings into the player. Called on launch and
+    /// Pushes the saved playback settings into the player. Called on launch and
     /// whenever Settings closes, so a changed curve takes effect on the next
     /// song rather than the next launch.
     private func syncFadeEnvelope() {
         audioPlayer.fadeEnvelope = AppSettingsService.fadeEnvelope(in: modelContext)
+        audioPlayer.masterVolume = AppSettingsService.playbackVolume(in: modelContext)
     }
 }
 

@@ -45,9 +45,29 @@ final class AudioPlayerService: ObservableObject {
     var fadeEnvelope: FadeEnvelope = .none {
         didSet {
             guard oldValue != fadeEnvelope else { return }
-            if isPlaying { startFadeTimer() } else { player?.volume = 1 }
+            if isPlaying { startFadeTimer() } else { applyCurrentVolume() }
         }
     }
+
+    /// Where the host has the fader, 0...1. The envelope rides *underneath* it,
+    /// so what the room hears is this times the envelope's gain — pulling the
+    /// level down mid-round doesn't flatten the fades, it scales them.
+    /// Clamped where it's used rather than in `didSet` — assigning to the
+    /// property from inside its own observer re-enters the observer, and the
+    /// recursion only ends when the stack does.
+    @Published var masterVolume: Double = 1 {
+        didSet {
+            guard manualFade == nil else { return }
+            applyCurrentVolume()
+        }
+    }
+
+    /// The fader, guaranteed to be in range whatever a caller stored.
+    private var clampedMasterVolume: Double { min(max(masterVolume, 0), 1) }
+
+    /// What's actually coming out right now, 0...1 — the fader times the
+    /// envelope at the playhead. This is the number a meter should draw.
+    @Published private(set) var outputLevel: Double = 1
 
     var progress: Double {
         guard duration > 0 else { return 0 }
@@ -107,18 +127,16 @@ final class AudioPlayerService: ObservableObject {
             let end = Self.resolvedClipEnd(clipEnd, start: start, fileDuration: player.duration)
 
             player.currentTime = start
-            // Volume has to be set before the first sample, or a fade-in
-            // starts at full level for the frames before the ticker catches it.
-            player.volume = Float(
-                fadeEnvelope.gain(atElapsed: 0, clipDuration: (end ?? player.duration) - start)
-            )
-            player.play()
             self.player = player
             self.currentSong = song
             self.duration = player.duration
             self.currentTime = start
             self.clipStartTime = start
             self.clipEndTime = end
+            // Volume has to be set before the first sample, or a fade-in
+            // starts at full level for the frames before the ticker catches it.
+            applyCurrentVolume()
+            player.play()
             self.isPlaying = true
             self.playbackError = nil
             startTimer()
@@ -198,7 +216,7 @@ final class AudioPlayerService: ObservableObject {
         clipStartTime = startTime
         clipEndTime = Self.resolvedClipEnd(endTime, start: startTime, fileDuration: player.duration)
         isPreviewing = true
-        player.volume = Float(fadeEnvelope.gain(atElapsed: 0, clipDuration: max(endTime - startTime, 0)))
+        applyCurrentVolume()
         player.play()
         isPlaying = true
         startTimer()
@@ -218,7 +236,68 @@ final class AudioPlayerService: ObservableObject {
         clipEndTime = nil
         currentTime = 0
         duration = 0
+        // Nothing is coming out, so the meter rests at where the fader is
+        // rather than holding the last fade's dying level.
+        outputLevel = clampedMasterVolume
         clearNowPlayingInfo()
+    }
+
+    // MARK: - Segment timing
+
+    /// Everything a deck needs to narrate the segment being played: where it
+    /// starts and ends inside the file, where the fades land, and how far in
+    /// the playhead is.
+    ///
+    /// The fade lengths here are the *resolved* ones — on a clip too short for
+    /// both, they're the scaled-down values actually being played, not what
+    /// the settings ask for.
+    struct SegmentTiming: Equatable {
+        /// Absolute times in the file.
+        var start: TimeInterval
+        var end: TimeInterval
+        var fadeIn: TimeInterval
+        var fadeOut: TimeInterval
+        /// Seconds into the segment, clamped to it.
+        var elapsed: TimeInterval
+
+        var duration: TimeInterval { max(end - start, 0) }
+        var remaining: TimeInterval { max(duration - elapsed, 0) }
+
+        /// Absolute times, for labelling against the file's own clock.
+        var fadeInEndsAt: TimeInterval { start + fadeIn }
+        var fadeOutStartsAt: TimeInterval { end - fadeOut }
+
+        /// Seconds until the fade-out begins, nil once it has.
+        var untilFadeOut: TimeInterval? {
+            guard fadeOut > 0 else { return nil }
+            let left = duration - fadeOut - elapsed
+            return left > 0 ? left : nil
+        }
+
+        var isFadingIn: Bool { fadeIn > 0 && elapsed < fadeIn }
+        var isFadingOut: Bool { fadeOut > 0 && remaining <= fadeOut && duration > 0 }
+
+        /// Where the playhead sits across the segment, 0...1.
+        var progress: Double {
+            guard duration > 0 else { return 0 }
+            return min(max(elapsed / duration, 0), 1)
+        }
+    }
+
+    /// The segment currently loaded, or nil when nothing is.
+    var segmentTiming: SegmentTiming? {
+        guard let player, currentSong != nil else { return nil }
+        let end = clipEndTime ?? player.duration
+        let duration = end - clipStartTime
+        guard duration > 0 else { return nil }
+        let (fadeIn, fadeOut) = fadeEnvelope.resolvedDurations(clipDuration: duration)
+        return SegmentTiming(
+            start: clipStartTime,
+            end: end,
+            fadeIn: fadeIn,
+            fadeOut: fadeOut,
+            elapsed: min(max(currentTime - clipStartTime, 0), duration)
+        )
     }
 
     @discardableResult
@@ -435,9 +514,9 @@ final class AudioPlayerService: ObservableObject {
     }
 
     private func tickManualFade() {
-        guard let fade = manualFade, let player else { return }
+        guard let fade = manualFade, player != nil else { return }
         let progress = min(Date().timeIntervalSince(fade.startedAt) / fade.duration, 1)
-        player.volume = fade.startVolume * Float(fade.curve.fallingGain(at: progress))
+        setOutput(level: Double(fade.startVolume) * fade.curve.fallingGain(at: progress))
         guard progress >= 1 else { return }
         finishManualFade()
     }
@@ -465,13 +544,56 @@ final class AudioPlayerService: ObservableObject {
         if isPlaying {
             startFadeTimer()
         } else {
-            player?.volume = 1
+            applyCurrentVolume()
         }
+    }
+
+    // MARK: - Level
+
+    /// The envelope's gain at the playhead right now, 1 when no fade applies.
+    private var envelopeGainNow: Double {
+        guard let player, fadeEnvelope.isActive else { return 1 }
+        let clipEnd = clipEndTime ?? player.duration
+        let clipDuration = clipEnd - clipStartTime
+        guard clipDuration > 0 else { return 1 }
+        return fadeEnvelope.gain(
+            atElapsed: player.currentTime - clipStartTime,
+            clipDuration: clipDuration
+        )
+    }
+
+    private func applyCurrentVolume() {
+        setOutput(level: clampedMasterVolume * envelopeGainNow)
+    }
+
+    /// The one place `player.volume` is written, so the meter can never
+    /// disagree with what's actually coming out.
+    private func setOutput(level: Double) {
+        let level = min(max(level, 0), 1)
+        player?.volume = Float(level)
+        publish(level: level)
+    }
+
+    /// The fade ticker runs at 60Hz. Republishing at that rate would redraw
+    /// every view watching the player sixty times a second for a bar a few
+    /// points tall, so the meter gets a slower, still-smooth feed.
+    private static let levelPublishInterval: TimeInterval = 1.0 / 24.0
+    private var lastLevelPublish = Date.distantPast
+
+    private func publish(level: Double) {
+        let now = Date()
+        guard abs(level - outputLevel) > 0.002 else { return }
+        // Big jumps — a new song, the fader being dragged — land immediately;
+        // the gradual crawl of a fade is what gets rate-limited.
+        guard abs(level - outputLevel) > 0.05
+            || now.timeIntervalSince(lastLevelPublish) >= Self.levelPublishInterval else { return }
+        lastLevelPublish = now
+        outputLevel = level
     }
 
     private func startFadeTimer() {
         guard fadeEnvelope.isActive else {
-            player?.volume = 1
+            applyCurrentVolume()
             return
         }
         stopFadeTimer()
@@ -490,16 +612,8 @@ final class AudioPlayerService: ObservableObject {
 
     /// Rides the volume to match the envelope at the current playhead.
     private func applyFadeEnvelope() {
-        guard let player, fadeEnvelope.isActive, manualFade == nil else { return }
-
-        // The clip is the trimmed window when there is one — a sound byte
-        // preview, or a round playing a trimmed segment — otherwise the file.
-        let clipEnd = clipEndTime ?? player.duration
-        let clipDuration = clipEnd - clipStartTime
-        guard clipDuration > 0 else { return }
-
-        let elapsed = player.currentTime - clipStartTime
-        player.volume = Float(fadeEnvelope.gain(atElapsed: elapsed, clipDuration: clipDuration))
+        guard player != nil, fadeEnvelope.isActive, manualFade == nil else { return }
+        applyCurrentVolume()
     }
 
     private func updateTime() {

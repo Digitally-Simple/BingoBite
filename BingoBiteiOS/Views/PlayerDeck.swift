@@ -667,17 +667,23 @@ private struct GameDeckExpandedContent: View {
     var isCompleted: Bool
     var canGoBack: Bool
     var canGoForward: Bool
-    var isPlaying: Bool
     var canPlayPause: Bool
     var canShuffle: Bool
     var shuffleIncludesPreviouslyPlayed: Bool
+    /// The tall deck is where a host watches a round rather than just moves
+    /// it, so it takes the player itself: the monitor underneath needs the
+    /// live level and segment timing, not a snapshot of them.
+    @ObservedObject var audioPlayer: AudioPlayerService
 
     var onPrevious: () -> Void
     var onPlayPause: () -> Void
     var onNext: () -> Void
     var onShuffle: () -> Void
     var onInspect: () -> Void
+    var onVolumeCommit: () -> Void
     var onCollapse: () -> Void
+
+    private var isPlaying: Bool { audioPlayer.isPlaying }
 
     var body: some View {
         DeckExpandedShell(artwork: song?.artworkData, onCollapse: onCollapse) {
@@ -733,6 +739,11 @@ private struct GameDeckExpandedContent: View {
                             .padding(.leading, 6)
                     }
                     .padding(.top, 12)
+
+                    if song != nil {
+                        SegmentMonitor(audioPlayer: audioPlayer, onVolumeCommit: onVolumeCommit)
+                            .padding(.top, 14)
+                    }
                 }
             }
         }
@@ -764,6 +775,8 @@ struct GameDeck: View {
     var onNext: () -> Void
     var onShuffle: () -> Void
     var onInspect: () -> Void
+    /// Fired when the fader is let go, so the game screen can persist the level.
+    var onVolumeCommit: () -> Void
 
     /// Artist and album together — the host is reading these out loud, so the
     /// deck carries the same identifying detail the printed cards do.
@@ -782,15 +795,16 @@ struct GameDeck: View {
                 isCompleted: isCompleted,
                 canGoBack: canGoBack,
                 canGoForward: canGoForward,
-                isPlaying: audioPlayer.isPlaying,
                 canPlayPause: canPlayPause,
                 canShuffle: canShuffle,
                 shuffleIncludesPreviouslyPlayed: shuffleIncludesPreviouslyPlayed,
+                audioPlayer: audioPlayer,
                 onPrevious: onPrevious,
                 onPlayPause: onPlayPause,
                 onNext: onNext,
                 onShuffle: onShuffle,
                 onInspect: onInspect,
+                onVolumeCommit: onVolumeCommit,
                 onCollapse: collapse
             )
         } row: { isExpanded, toggle in

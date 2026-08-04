@@ -29,6 +29,14 @@ final class AppSettings {
 
     var autoplayGap: TimeInterval = 5.0
 
+    // MARK: - Level
+    //
+    // Where the host left the fader. Remembered because a level set at
+    // soundcheck shouldn't reset to full the next time the app launches —
+    // finding out it did, mid-room, is the wrong way to find out.
+
+    var playbackVolume: Double = 1.0
+
     init(lastOpenedDate: Date? = nil) {
         self.lastOpenedDate = lastOpenedDate
     }

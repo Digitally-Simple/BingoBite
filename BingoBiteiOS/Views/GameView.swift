@@ -250,7 +250,10 @@ struct GameView: View {
             onPlayPause: playPause,
             onNext: nextSong,
             onShuffle: shuffleRemainingSongs,
-            onInspect: { if let currentSong { onInspectSong(currentSong) } }
+            onInspect: { if let currentSong { onInspectSong(currentSong) } },
+            onVolumeCommit: {
+                AppSettingsService.setPlaybackVolume(audioPlayer.masterVolume, in: modelContext)
+            }
         )
     }
 
