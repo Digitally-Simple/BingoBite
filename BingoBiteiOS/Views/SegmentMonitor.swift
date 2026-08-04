@@ -189,19 +189,54 @@ struct ChannelMeters: View {
 
     private func bar(level: Double) -> some View {
         GeometryReader { geo in
+            let height = geo.size.height
             ZStack(alignment: .bottom) {
                 Capsule().fill(.quaternary.opacity(0.55))
 
+                // The gradient is anchored to the *full* bar and then masked
+                // to the level, so a colour always means the same number of
+                // decibels. Painting it into a bar sized to the level instead
+                // would squash the whole scale into whatever is playing, and
+                // every peak would look like it was in the red.
                 Capsule()
-                    .fill(.tint)
-                    .frame(height: geo.size.height * min(max(level, 0), 1))
-                    // Matches the feed rate: any slower and the bar smears
-                    // through the beat it's supposed to be showing.
-                    .animation(.linear(duration: 1.0 / 24.0), value: level)
+                    .fill(Self.zones)
+                    .frame(height: height)
+                    .mask(alignment: .bottom) {
+                        Rectangle()
+                            .frame(height: height * min(max(level, 0), 1))
+                            // Matches the feed rate: any slower and the bar
+                            // smears through the beat it's meant to show.
+                            .animation(.linear(duration: 1.0 / 24.0), value: level)
+                    }
             }
         }
         .frame(width: 8)
     }
+
+    /// Hard stops rather than a blend, so the boundaries are legible as
+    /// boundaries — a meter that fades green into red doesn't tell you which
+    /// one you're in.
+    private static let zones = LinearGradient(
+        stops: [
+            .init(color: .meterSafe, location: 0),
+            .init(color: .meterSafe, location: AudioLevelMeter.cautionThreshold),
+            .init(color: .meterCaution, location: AudioLevelMeter.cautionThreshold),
+            .init(color: .meterCaution, location: AudioLevelMeter.hotThreshold),
+            .init(color: .meterHot, location: AudioLevelMeter.hotThreshold),
+            .init(color: .meterHot, location: 1),
+        ],
+        startPoint: .bottom,
+        endPoint: .top
+    )
+}
+
+private extension Color {
+    /// Meter colours, set explicitly rather than taken from the system palette:
+    /// these have to hold their meaning on the deck's dark glass, and the app's
+    /// own accent is already red.
+    static let meterSafe = Color(red: 0.20, green: 0.80, blue: 0.35)
+    static let meterCaution = Color(red: 1.00, green: 0.78, blue: 0.15)
+    static let meterHot = Color(red: 1.00, green: 0.27, blue: 0.23)
 }
 
 /// The master level, as a Control Center–style column.

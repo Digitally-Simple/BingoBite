@@ -69,6 +69,21 @@ final class AudioLevelMeter: ObservableObject {
         return min(max((decibels - floorDB) / -floorDB, 0), 1)
     }
 
+    // MARK: - Zones
+    //
+    // Where the bar changes colour, given as fractions of its height so a view
+    // can build a gradient from them — but *defined* in dBFS, because that's
+    // what the boundaries actually mean. Comfortable below -12, working up to
+    // -3, hot above it. Note these describe the level going out, not the file:
+    // pulling the fader down takes the meter out of the red, which is exactly
+    // what a host wants it to mean.
+
+    /// Green gives way to amber here.
+    static let cautionThreshold = normalize(decibels: -12)
+
+    /// Amber gives way to red here.
+    static let hotThreshold = normalize(decibels: -3)
+
     /// Rises instantly and falls away — the same asymmetry a hardware meter
     /// has. Without it the bar strobes on every kick drum instead of dancing.
     private static let release: Double = 0.4
